@@ -1281,6 +1281,15 @@ async def reset_count_sessions(user_id: int, request: Request):
         cursor = await conn.execute("SELECT username FROM users WHERE id = ?", (user_id,))
         user = await cursor.fetchone()
         if user:
+            # First, get all session_ids for the user
+            cursor = await conn.execute("SELECT id FROM count_sessions WHERE user_username = ?", (user[0],))
+            session_ids = [row[0] for row in await cursor.fetchall()]
+
+            if session_ids:
+                # Delete all stock_counts associated with those session_ids
+                await conn.execute(f"DELETE FROM stock_counts WHERE session_id IN ({','.join(['?']*len(session_ids))})", session_ids)
+
+            # Now, delete the count_sessions for the user
             await conn.execute("DELETE FROM count_sessions WHERE user_username = ?", (user[0],))
             await conn.commit()
     
