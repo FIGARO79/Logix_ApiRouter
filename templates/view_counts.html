@@ -44,9 +44,10 @@
                 <div class="overflow-x-auto table-container">
                     <table class="min-w-full leading-normal">
                         <thead class="bg-gray-800 text-white">
-                            <tr>
-                                <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">ID Conteo</th>
+                                <tr>
+                                    <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">ID Conteo</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">ID Sesión</th>
+                                <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Usuario</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Timestamp</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Item Code</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Descripción</th>
@@ -63,6 +64,7 @@
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.id }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.session_id }}</td>
+                                    <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.username if count.username is not none else '-' }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.timestamp }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm font-medium text-gray-800">{{ count.item_code }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.item_description }}</td>
@@ -77,7 +79,7 @@
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="10" class="text-center py-10 text-gray-500">No hay registros de conteo para mostrar.</td>
+                                    <td colspan="11" class="text-center py-10 text-gray-500">No hay registros de conteo para mostrar.</td>
                                 </tr>
                             {% endif %}
                         </tbody>

@@ -955,6 +955,22 @@ async def view_counts_page(request: Request, username: str = Depends(login_requi
     # Optimización: usar el mapa en memoria master_qty_map (item_code -> int|None)
     master_map = master_qty_map
 
+    # Construir mapeo session_id -> user_username para mostrar quién realizó el conteo
+    session_map = {}
+    session_ids = list({c.get('session_id') for c in all_counts if c.get('session_id') is not None})
+    if session_ids:
+        try:
+            async with aiosqlite.connect(DB_FILE_PATH) as conn:
+                conn.row_factory = aiosqlite.Row
+                placeholders = ','.join('?' * len(session_ids))
+                query = f"SELECT id, user_username FROM count_sessions WHERE id IN ({placeholders})"
+                async with conn.execute(query, tuple(session_ids)) as cursor:
+                    rows = await cursor.fetchall()
+                    for r in rows:
+                        session_map[r['id']] = r['user_username']
+        except Exception:
+            session_map = {}
+
     # Enriquecer los conteos con cantidad del sistema y diferencia para análisis.
     enriched_counts = []
     for count in all_counts:
@@ -981,6 +997,8 @@ async def view_counts_page(request: Request, username: str = Depends(login_requi
         enriched = dict(count)
         enriched['system_qty'] = system_qty
         enriched['difference'] = difference
+        # Añadir nombre de usuario que realizó la sesión (si disponible)
+        enriched['username'] = session_map.get(count.get('session_id')) if session_map else None
         enriched_counts.append(enriched)
 
     return templates.TemplateResponse('view_counts.html', {"request": request, "counts": enriched_counts})
