@@ -1001,7 +1001,86 @@ async def view_counts_page(request: Request, username: str = Depends(login_requi
         enriched['username'] = session_map.get(count.get('session_id')) if session_map else None
         enriched_counts.append(enriched)
 
-    return templates.TemplateResponse('view_counts.html', {"request": request, "counts": enriched_counts})
+    # Construir lista de usuarios únicos para el filtro en la UI
+    usernames = sorted({u for u in session_map.values() if u})
+
+    return templates.TemplateResponse('view_counts.html', {"request": request, "counts": enriched_counts, "usernames": usernames})
+
+
+@app.get('/api/export_counts')
+async def export_counts(username: str = Depends(login_required)):
+    """Exporta todos los conteos enriquecidos a Excel (incluye usuario, system_qty y diferencia)."""
+    all_counts = await load_all_counts_db_async()
+
+    # Usar master_qty_map y consultar sesiones para mapear usernames
+    master_map = master_qty_map
+    session_map = {}
+    session_ids = list({c.get('session_id') for c in all_counts if c.get('session_id') is not None})
+    if session_ids:
+        try:
+            async with aiosqlite.connect(DB_FILE_PATH) as conn:
+                conn.row_factory = aiosqlite.Row
+                placeholders = ','.join('?' * len(session_ids))
+                query = f"SELECT id, user_username FROM count_sessions WHERE id IN ({placeholders})"
+                async with conn.execute(query, tuple(session_ids)) as cursor:
+                    rows = await cursor.fetchall()
+                    for r in rows:
+                        session_map[r['id']] = r['user_username']
+        except Exception:
+            session_map = {}
+
+    enriched_rows = []
+    for count in all_counts:
+        item_code = count.get('item_code')
+        raw_system = master_map.get(item_code) if master_map else None
+        system_qty = None
+        if raw_system not in (None, ''):
+            try:
+                system_qty = int(float(raw_system))
+            except (ValueError, TypeError):
+                system_qty = None
+
+        try:
+            counted_qty = int(count.get('counted_qty') or 0)
+        except (ValueError, TypeError):
+            counted_qty = 0
+
+        difference = (counted_qty - system_qty) if system_qty is not None else None
+
+        enriched = {
+            'id': count.get('id'),
+            'session_id': count.get('session_id'),
+            'username': session_map.get(count.get('session_id')) if session_map else None,
+            'timestamp': count.get('timestamp'),
+            'item_code': item_code,
+            'item_description': count.get('item_description'),
+            'counted_location': count.get('counted_location'),
+            'counted_qty': counted_qty,
+            'system_qty': system_qty,
+            'difference': difference,
+            'bin_location_system': count.get('bin_location_system')
+        }
+        enriched_rows.append(enriched)
+
+    # Construir DataFrame y exportar a Excel
+    df = pd.DataFrame(enriched_rows)
+    # Reordenar columnas para la exportación
+    columns_order = ['id', 'session_id', 'username', 'timestamp', 'item_code', 'item_description', 'counted_location', 'counted_qty', 'system_qty', 'difference', 'bin_location_system']
+    df = df[columns_order]
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Conteos')
+        worksheet = writer.sheets['Conteos']
+        for i, col_name in enumerate(df.columns):
+            column_letter = get_column_letter(i + 1)
+            max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2
+            worksheet.column_dimensions[column_letter].width = max_len
+
+    output.seek(0)
+    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"conteos_export_{timestamp_str}.xlsx"
+    return Response(content=output.getvalue(), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 @app.get('/reconciliation', response_class=HTMLResponse)
 async def reconciliation_page(request: Request, username: str = Depends(login_required)):
