@@ -107,7 +107,6 @@ class StockCount(BaseModel):
     item_code: str
     counted_qty: int
     counted_location: str
-    system_qty: Optional[int] = 0
     description: Optional[str] = ''
     bin_location_system: Optional[str] = ''
 
@@ -235,9 +234,7 @@ async def init_db():
                     timestamp TEXT NOT NULL,
                     item_code TEXT NOT NULL,
                     item_description TEXT,
-                    system_qty INTEGER,
                     counted_qty INTEGER NOT NULL,
-                    difference INTEGER,
                     counted_location TEXT NOT NULL,
                     bin_location_system TEXT,
                     FOREIGN KEY(session_id) REFERENCES count_sessions(id)
@@ -709,15 +706,11 @@ async def get_item_details_for_label(item_code: str, username: str = Depends(log
 async def get_item_for_counting(item_code: str, username: str = Depends(login_required)):
     details = await get_item_details_from_master_csv(item_code)
     if details:
-        try:
-            stock_on_hand = int(float(details.get('Physical_Qty', 0)))
-        except (ValueError, TypeError):
-            stock_on_hand = 0
+        # Inventario ciego - no devolvemos cantidad de stock
         response_data = {
             'item_code': details.get('Item_Code'),
             'description': details.get('Item_Description'),
-            'bin_location': details.get('Bin_1'),
-            'stock_qty': stock_on_hand
+            'bin_location': details.get('Bin_1')
         }
         return JSONResponse(content=response_data)
     else:
@@ -747,19 +740,16 @@ async def save_count(data: StockCount, username: str = Depends(login_required)):
                 raise HTTPException(status_code=400, detail=f"La ubicación {data.counted_location} ya está cerrada y no se puede modificar.")
 
             # 3. Insertar el conteo
-            system_qty = int(data.system_qty)
             counted_qty = int(data.counted_qty)
-            difference = counted_qty - system_qty
-
+            # Para inventario ciego, no usamos system_qty ni calculamos difference
             await conn.execute(
                 '''
-                INSERT INTO stock_counts (session_id, timestamp, item_code, item_description, system_qty, counted_qty, difference, counted_location, bin_location_system)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO stock_counts (session_id, timestamp, item_code, item_description, counted_qty, counted_location, bin_location_system)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''',
                 (
                     data.session_id, datetime.datetime.now().isoformat(timespec='seconds'), data.item_code,
-                    data.description, system_qty, counted_qty, difference,
-                    data.counted_location, data.bin_location_system
+                    data.description, counted_qty, data.counted_location, data.bin_location_system
                 )
             )
             await conn.commit()

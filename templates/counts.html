@@ -152,10 +152,7 @@
                         <div id="bin_location" class="data-field"></div>
                     </div>
 
-                    <div>
-                        <label class="form-label">Cantidad en Sistema</label>
-                        <div id="stock_qty" class="data-field"></div>
-                    </div>
+
                     
                     <hr class="my-6">
 
@@ -230,7 +227,6 @@
             const scanItemButton = document.getElementById('scan-item-btn');
             const scanLocationButton = document.getElementById('scan-location-btn');
             const descriptionDiv = document.getElementById('description');
-            const stockQtyDiv = document.getElementById('stock_qty');
             const binLocationDiv = document.getElementById('bin_location');
             const countedQtyInput = document.getElementById('counted_qty');
             const countedLocationInput = document.getElementById('counted_location');
@@ -280,7 +276,6 @@
             function clearForm(clearLocation = false) {
                 itemCodeInput.value = '';
                 descriptionDiv.textContent = '';
-                stockQtyDiv.textContent = '';
                 binLocationDiv.textContent = '';
                 countedQtyInput.value = '1';
                 currentItemData = {};
@@ -375,7 +370,6 @@
                         showToast("Artículo encontrado.", "success");
                         currentItemData = data;
                         descriptionDiv.textContent = data.description;
-                        stockQtyDiv.textContent = data.stock_qty;
                         binLocationDiv.textContent = data.bin_location;
                         countedQtyInput.focus();
                     } else {
@@ -408,7 +402,6 @@
                     session_id: activeSession.id,
                     item_code: itemCode,
                     description: currentItemData.description,
-                    system_qty: currentItemData.stock_qty,
                     bin_location_system: currentItemData.bin_location,
                     counted_qty: parseInt(countedQty, 10),
                     counted_location: countedLocation
