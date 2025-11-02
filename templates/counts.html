@@ -102,7 +102,7 @@
             <!-- Left Column: Counting Form -->
             <div class="md:col-span-2 bg-white p-6 rounded-lg shadow">
                 <div class="flex justify-between items-center border-b pb-2 mb-4">
-                     <h1 class="text-xl font-semibold text-gray-800">Realizar Conteo (<span id="username-display"></span>)</h1>
+                     <h1 class="text-xl font-semibold text-gray-800">Realizar Conteo (<span id="username-display"></span> - Sesión: <span id="session-id-display"></span>)</h1>
                      <button id="end-session-btn" class="btn btn-secondary">Finalizar Sesión</button>
                 </div>
                 
@@ -188,7 +188,7 @@
                     <div id="session-locations-list" class="max-h-60 overflow-y-auto">
                         <!-- Location statuses will be dynamically inserted here -->
                     </div>
-                     <button id="next-stage-btn" class="btn btn-primary w-full mt-2 text-sm">Avanzar Etapa de Conteo</button>
+                     <button id="close-location-btn" class="btn btn-primary w-full mt-2 text-sm">Cerrar Ubicación Actual</button>
                 </div>
             </div>
         </div>
@@ -218,6 +218,7 @@
             const startSessionBtn = document.getElementById('start-session-btn');
             const endSessionBtn = document.getElementById('end-session-btn');
             const usernameDisplay = document.getElementById('username-display');
+            const sessionIdDisplay = document.getElementById('session-id-display');
             const closeLocationBtn = document.getElementById('close-location-btn');
             const countedItemsList = document.getElementById('counted-items-list');
             const sessionLocationsList = document.getElementById('session-locations-list');
@@ -248,10 +249,7 @@
                 success: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>',
                 error: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>',
                 info: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
-            };
-
-            // --- UI & TOAST FUNCTIONS ---
-            function showToast(message, type = "info") {
+            };            function showToast(message, type = "info") {
                 const toast = document.createElement("div");
                 toast.className = `toast ${type}`;
                 toast.innerHTML = `<div class="toast-icon">${ICONS[type] || ICONS.info}</div><span>${message}</span>`;
@@ -313,10 +311,10 @@
                 locations.forEach(loc => {
                     const locDiv = document.createElement('div');
                     locDiv.className = 'flex justify-between items-center text-sm p-1';
-                    const stageText = loc.count_stage ? `Etapa ${loc.count_stage}` : '';
+                    const statusClass = loc.status === 'closed' ? 'text-red-500' : 'text-green-500';
                     locDiv.innerHTML = `
                         <span>${loc.location_code}</span>
-                        <span class="font-semibold">${stageText}</span>
+                        <span class="font-semibold ${statusClass}">${loc.status.toUpperCase()}</span>
                     `;
                     sessionLocationsList.appendChild(locDiv);
                 });
@@ -460,6 +458,7 @@
                         sessionControlContainer.classList.add('hidden');
                         countingView.classList.remove('hidden');
                         usernameDisplay.textContent = activeSession.user_username;
+                        sessionIdDisplay.textContent = activeSession.id;
                         await updateSessionData();
                     } else {
                         activeSession = null;
@@ -472,14 +471,18 @@
             }
 
             async function handleStartSession() {
+                console.log("handleStartSession called");
                 toggleButtonSpinner(startSessionBtn, true, '<span>Iniciar...</span>');
                 try {
                     const response = await fetch(`${API_BASE_URL}/sessions/start`, { method: 'POST' });
+                    console.log("Response from /api/sessions/start:", response);
                     const data = await response.json();
+                    console.log("Data from /api/sessions/start:", data);
                     if (!response.ok) throw new Error(data.detail || 'No se pudo iniciar la sesión');
                     showToast(data.message, 'success');
                     await checkActiveSession();
                 } catch (error) {
+                    console.error("Error in handleStartSession:", error);
                     showToast(`Error: ${error.message}`, 'error');
                 } finally {
                     toggleButtonSpinner(startSessionBtn, false, '<span>Iniciar Nueva Sesión de Conteo</span>');
@@ -503,30 +506,30 @@
                 }
             }
 
-            async function handleNextStage() {
+            async function handleCloseLocation() {
                 const locationCode = countedLocationInput.value.trim();
                 if (!activeSession || !locationCode) {
-                    showToast("Por favor, ingresa una ubicación para avanzar a la siguiente etapa.", "error");
+                    showToast("Por favor, ingresa una ubicación para cerrarla.", "error");
                     return;
                 }
-                if (!confirm(`¿Estás seguro de avanzar la ubicación ${locationCode} a la siguiente etapa de conteo?`)) return;
+                if (!confirm(`¿Estás seguro de cerrar la ubicación ${locationCode}? No podrás agregar más conteos.`)) return;
 
-                toggleButtonSpinner(nextStageBtn, true, 'Avanzando...');
+                toggleButtonSpinner(closeLocationBtn, true, 'Cerrando...');
                 try {
                     const payload = { session_id: activeSession.id, location_code: locationCode };
-                    const response = await fetch(`${API_BASE_URL}/locations/next_stage`, {
+                    const response = await fetch(`${API_BASE_URL}/locations/close`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                     const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || 'No se pudo avanzar la etapa de la ubicación');
+                    if (!response.ok) throw new Error(data.detail || 'No se pudo cerrar la ubicación');
                     showToast(data.message, 'success');
                     await updateSessionData();
                 } catch (error) {
                     showToast(`Error: ${error.message}`, 'error');
                 } finally {
-                    toggleButtonSpinner(nextStageBtn, false, 'Avanzar Etapa de Conteo');
+                    toggleButtonSpinner(closeLocationBtn, false, 'Cerrar Ubicación Actual');
                 }
             }
 
@@ -568,8 +571,7 @@
             // --- EVENT LISTENERS ---
             startSessionBtn.addEventListener('click', handleStartSession);
             endSessionBtn.addEventListener('click', handleEndSession);
-            const nextStageBtn = document.getElementById('next-stage-btn');
-            nextStageBtn.addEventListener('click', handleNextStage);
+            closeLocationBtn.addEventListener('click', handleCloseLocation);
             scanLocationButton.addEventListener('click', () => startScanner(countedLocationInput));
             scanItemButton.addEventListener('click', () => startScanner(itemCodeInput));
             searchButton.addEventListener('click', fetchItemData);

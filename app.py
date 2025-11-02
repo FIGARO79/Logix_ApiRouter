@@ -235,20 +235,11 @@ async def init_db():
                     session_id INTEGER NOT NULL,
                     location_code TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'open', -- open, closed
-                    count_stage INTEGER NOT NULL DEFAULT 1, -- Etapa del conteo
                     closed_at TEXT,
                     FOREIGN KEY(session_id) REFERENCES count_sessions(id)
                 )
             ''')
-
-            # --- Migración para añadir count_stage si no existe ---
-            cursor = await conn.execute("PRAGMA table_info(session_locations)")
-            columns = [row['name'] for row in await cursor.fetchall()]
-            if 'count_stage' not in columns:
-                print("Migrando esquema: añadiendo 'count_stage' a 'session_locations'.")
-                await conn.execute("ALTER TABLE session_locations ADD COLUMN count_stage INTEGER NOT NULL DEFAULT 1;")
-
-                        # --- Tabla de Conteos (Modificada) ---
+            # --- Tabla de Conteos (Modificada) ---
             # Se añade session_id y se mejora la estructura.
             # NOTA: En producción NO eliminamos la tabla para preservar los conteos.
             # Si necesitas forzar un esquema nuevo durante desarrollo, borra manualmente
@@ -419,21 +410,30 @@ async def load_all_counts_db_async():
 @app.post("/api/sessions/start", status_code=status.HTTP_201_CREATED)
 async def start_new_session(username: str = Depends(login_required)):
     """Inicia una nueva sesión de conteo para el usuario actual."""
+    print(f"Attempting to start a new session for user: {username}")
     async with aiosqlite.connect(DB_FILE_PATH) as conn:
-        # Opcional: Finalizar sesiones anteriores del mismo usuario
-        await conn.execute(
-            "UPDATE count_sessions SET status = 'completed', end_time = ? WHERE user_username = ? AND status = 'in_progress'",
-            (datetime.datetime.now().isoformat(timespec='seconds'), username)
-        )
+        try:
+            # Opcional: Finalizar sesiones anteriores del mismo usuario
+            print("Closing previous sessions...")
+            await conn.execute(
+                "UPDATE count_sessions SET status = 'completed', end_time = ? WHERE user_username = ? AND status = 'in_progress'",
+                (datetime.datetime.now().isoformat(timespec='seconds'), username)
+            )
+            print("Previous sessions closed.")
 
-        # Crear nueva sesión
-        cursor = await conn.execute(
-            "INSERT INTO count_sessions (user_username, start_time, status) VALUES (?, ?, ?)",
-            (username, datetime.datetime.now().isoformat(timespec='seconds'), 'in_progress')
-        )
-        await conn.commit()
-        session_id = cursor.lastrowid
-        return {"session_id": session_id, "message": f"Sesión {session_id} iniciada."}
+            # Crear nueva sesión
+            print("Creating new session...")
+            cursor = await conn.execute(
+                "INSERT INTO count_sessions (user_username, start_time, status) VALUES (?, ?, ?)",
+                (username, datetime.datetime.now().isoformat(timespec='seconds'), 'in_progress')
+            )
+            await conn.commit()
+            session_id = cursor.lastrowid
+            print(f"New session created with ID: {session_id}")
+            return {"session_id": session_id, "message": f"Sesión {session_id} iniciada."}
+        except aiosqlite.Error as e:
+            print(f"Database error in start_new_session: {e}")
+            raise HTTPException(status_code=500, detail=f"Error de base de datos: {e}")
 
 @app.get("/api/sessions/active")
 async def get_active_session(username: str = Depends(login_required)):
@@ -467,12 +467,11 @@ async def close_session(session_id: int, username: str = Depends(login_required)
         await conn.commit()
         return {"message": f"Sesión {session_id} cerrada con éxito."}
 
-@app.post("/api/locations/next_stage")
-async def next_count_stage(data: CloseLocationRequest, username: str = Depends(login_required)):
-    """Avanza una ubicación a la siguiente etapa de conteo."""
+@app.post("/api/locations/close")
+async def close_location(data: CloseLocationRequest, username: str = Depends(login_required)):
+    """Marca una ubicación como 'cerrada' para una sesión de conteo."""
     async with aiosqlite.connect(DB_FILE_PATH) as conn:
-        conn.row_factory = aiosqlite.Row
-        # Verificar que la sesión es válida
+        # Verificar que la sesión existe y pertenece al usuario
         cursor = await conn.execute(
             "SELECT id FROM count_sessions WHERE id = ? AND user_username = ? AND status = 'in_progress'",
             (data.session_id, username)
@@ -480,33 +479,16 @@ async def next_count_stage(data: CloseLocationRequest, username: str = Depends(l
         if not await cursor.fetchone():
             raise HTTPException(status_code=403, detail="La sesión no es válida o no te pertenece.")
 
-        # Obtener el estado actual de la ubicación
-        cursor = await conn.execute(
-            "SELECT status, count_stage FROM session_locations WHERE session_id = ? AND location_code = ?",
-            (data.session_id, data.location_code)
+        # Insertar o actualizar el estado de la ubicación
+        await conn.execute(
+            """
+            INSERT INTO session_locations (session_id, location_code, status, closed_at)
+            VALUES (?, ?, 'closed', ?)
+            """,
+            (data.session_id, data.location_code, datetime.datetime.now().isoformat(timespec='seconds'))
         )
-        location_data = await cursor.fetchone()
-
-        current_stage = location_data['count_stage'] if location_data else 0
-
-        if current_stage >= 4:
-            raise HTTPException(status_code=400, detail=f"La ubicación {data.location_code} ya ha alcanzado el número máximo de conteos.")
-
-        if location_data:
-            # Si la ubicación ya existe, actualiza la etapa
-            await conn.execute(
-                "UPDATE session_locations SET count_stage = ?, status = 'open', closed_at = NULL WHERE session_id = ? AND location_code = ?",
-                (current_stage + 1, data.session_id, data.location_code)
-            )
-        else:
-            # Si es la primera vez que se cierra, se inserta con etapa 2
-            await conn.execute(
-                "INSERT INTO session_locations (session_id, location_code, status, count_stage) VALUES (?, ?, 'open', 2)",
-                (data.session_id, data.location_code)
-            )
-        
         await conn.commit()
-        return {"message": f"Ubicación {data.location_code} avanzada a la etapa de conteo {current_stage + 1}."}
+        return {"message": f"Ubicación {data.location_code} cerrada para la sesión {data.session_id}."}
 
 @app.get("/api/sessions/{session_id}/locations")
 async def get_session_locations(session_id: int, username: str = Depends(login_required)):
@@ -521,7 +503,7 @@ async def get_session_locations(session_id: int, username: str = Depends(login_r
             raise HTTPException(status_code=403, detail="No tienes permiso para ver esta sesión.")
 
         cursor = await conn.execute(
-            "SELECT location_code, status, count_stage FROM session_locations WHERE session_id = ?", (session_id,)
+            "SELECT location_code, status FROM session_locations WHERE session_id = ?", (session_id,)
         )
         locations = await cursor.fetchall()
         return [dict(row) for row in locations]
@@ -784,15 +766,14 @@ async def save_count(data: StockCount, username: str = Depends(login_required)):
             if not await cursor.fetchone():
                 raise HTTPException(status_code=403, detail="La sesión de conteo no es válida, está cerrada o no te pertenece.")
 
+            # 2. Verificar que la ubicación no esté cerrada para esta sesión
             cursor = await conn.execute(
-                "SELECT status, count_stage FROM session_locations WHERE session_id = ? AND location_code = ?",
+                "SELECT status FROM session_locations WHERE session_id = ? AND location_code = ?",
                 (data.session_id, data.counted_location)
             )
-            location_data = await cursor.fetchone()
-            current_stage = location_data['count_stage'] if location_data else 1
-
-            if current_stage > 4:
-                raise HTTPException(status_code=400, detail=f"La ubicación {data.counted_location} ya ha alcanzado el número máximo de conteos.")
+            location_status = await cursor.fetchone()
+            if location_status and location_status['status'] == 'closed':
+                raise HTTPException(status_code=400, detail=f"La ubicación {data.counted_location} ya está cerrada y no se puede modificar.")
 
             # 3. Insertar el conteo
             counted_qty = int(data.counted_qty)
