@@ -49,7 +49,7 @@
                 </div>
             </div>
 
-            <div id="stats-container" class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <div id="stats-container" class="grid grid-cols-2 md:grid-cols-8 gap-2 mb-6">
                 <div class="bg-white p-4 rounded-lg shadow text-center">
                     <h3 class="text-sm font-medium text-gray-500">Items con Stock</h3>
                     <p id="stats-total-items" class="text-2xl font-bold text-gray-800">-</p>
@@ -78,7 +78,6 @@
                     <table class="min-w-full leading-normal">
                         <thead class="bg-gray-800 text-white">
                                 <tr>
-                                    <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">ID Conteo</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">ID Sesión</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Usuario</th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold uppercase tracking-wider">Timestamp</th>
@@ -95,7 +94,6 @@
                             {% if counts %}
                                 {% for count in counts %}
                                 <tr class="hover:bg-gray-50" data-username="{{ count.username if count.username is not none else '' }}">
-                                    <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.id }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.session_id }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.username if count.username is not none else '-' }}</td>
                                     <td class="px-5 py-4 border-b border-gray-200 text-sm">{{ count.timestamp }}</td>

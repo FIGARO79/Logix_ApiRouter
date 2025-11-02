@@ -966,9 +966,31 @@ async def stock_page(request: Request, username: str = Depends(login_required)):
 
 @app.get('/view_counts', response_class=HTMLResponse)
 async def view_counts_page(request: Request, username: str = Depends(login_required)):
-    if not isinstance(username, str):
-        return username
-    all_counts = await load_all_counts_db_async()
+    async with async_engine.connect() as conn:
+        all_counts = await conn.run_sync(
+            lambda sync_conn: pd.read_sql_query(
+                """
+                SELECT
+                    item_code,
+                    counted_location,
+                    SUM(counted_qty) as counted_qty,
+                    item_description,
+                    bin_location_system,
+                    username,
+                    session_id,
+                    MAX(timestamp) as timestamp
+                FROM
+                    stock_counts
+                GROUP BY
+                    item_code,
+                    counted_location
+                ORDER BY
+                    MAX(id) DESC
+                """,
+                sync_conn
+            )
+        )
+    all_counts = all_counts.to_dict(orient='records')
 
     # Optimización: usar el mapa en memoria master_qty_map (item_code -> int|None)
     master_map = master_qty_map
@@ -1111,8 +1133,8 @@ async def get_count_stats(username: str = Depends(login_required)):
             cursor = await conn.execute("SELECT COUNT(DISTINCT counted_location) FROM stock_counts")
             counted_locations = (await cursor.fetchone())[0]
 
-            # 2. Total de items contados (registros en la tabla)
-            cursor = await conn.execute("SELECT COUNT(id) FROM stock_counts")
+            # 2. Total de items contados (grupos de item/ubicación)
+            cursor = await conn.execute("SELECT COUNT(*) FROM (SELECT DISTINCT item_code, counted_location FROM stock_counts)")
             total_items_counted = (await cursor.fetchone())[0]
 
             # 3. Total de items con stock (del maestro de items)
