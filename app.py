@@ -964,6 +964,54 @@ async def stock_page(request: Request, username: str = Depends(login_required)):
         return username
     return templates.TemplateResponse('stock.html', {"request": request})
 
+@app.get("/api/picking/order/{order_number}/{despatch_number}")
+async def get_picking_order(order_number: str, despatch_number: str):
+    DB_FOLDER_PATH = os.path.join(os.path.dirname(__file__), 'databases')
+    try:
+        picking_file_path = os.path.join(DB_FOLDER_PATH, "AURRSGLBD0240 - Unconfirmed Picking Notes.csv")
+        if not os.path.exists(picking_file_path):
+            raise HTTPException(status_code=404, detail="El archivo de picking (AURRSGLBD0240.csv) no se encuentra.")
+
+        df = pd.read_csv(picking_file_path, dtype=str)
+        
+        # Asegurarse de que las columnas existen
+        required_columns = ["ORDER_", "DESPATCH_", "ITEM", "DESCRIPTION", "QTY", "CUSTOMER_NAME"]
+        if not all(col in df.columns for col in required_columns):
+            raise HTTPException(status_code=500, detail="El archivo CSV no tiene las columnas esperadas.")
+
+        # Filtrar los datos
+        order_data = df[
+            (df["ORDER_"] == order_number) & 
+            (df["DESPATCH_"] == despatch_number)
+        ]
+
+        if order_data.empty:
+            raise HTTPException(status_code=404, detail="Pedido no encontrado.")
+
+        # Renombrar las columnas para que coincidan con el frontend
+        order_data = order_data.rename(columns={
+            "ORDER_": "Order Number",
+            "DESPATCH_": "Despatch Number",
+            "ITEM": "Item Code",
+            "DESCRIPTION": "Item Description",
+            "QTY": "Qty",
+            "CUSTOMER_NAME": "Customer Name"
+        })
+
+        # Reemplazar NaN con None para que sea compatible con JSON
+        order_data = order_data.where(pd.notnull(order_data), None)
+
+        return JSONResponse(content=order_data.to_dict(orient="records"))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get('/picking', response_class=HTMLResponse)
+async def picking_page(request: Request, username: str = Depends(login_required)):
+    if not isinstance(username, str):
+        return username
+    return templates.TemplateResponse("picking.html", {"request": request, "username": username})
+
 @app.get('/view_counts', response_class=HTMLResponse)
 async def view_counts_page(request: Request, username: str = Depends(login_required)):
     async with async_engine.connect() as conn:
