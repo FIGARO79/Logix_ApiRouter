@@ -691,7 +691,7 @@ async def get_logs(username: str = Depends(login_required)):
     return JSONResponse(content=logs)
 
 @app.get('/api/stock')
-async def get_stock(username: str = Depends(login_required)):
+async def get_stock(): # <--- Se eliminó la dependencia 'Depends(login_required)'
     stock_df = await get_stock_data()
     if stock_df is not None:
         stock_df_filled = stock_df.replace({np.nan: None})
@@ -758,7 +758,6 @@ async def clear_database(password: str = Form(...)):
         return RedirectResponse(url=f'/update?{query_string}', status_code=status.HTTP_302_FOUND)
 
 @app.get('/api/stock_item/{item_code}')
-async def get_stock_item(item_code: str, username: str = Depends(login_required)):
     details = await get_item_details_from_master_csv(item_code)
     if details:
         response_data = {
@@ -1014,9 +1013,10 @@ def counts_page(request: Request, username: str = Depends(login_required)):
     return templates.TemplateResponse('counts.html', {"request": request})
 
 @app.get('/stock', response_class=HTMLResponse)
-async def stock_page(request: Request, username: str = Depends(login_required)):
-    if not isinstance(username, str):
-        return username
+async def stock_page(request: Request): # <--- Se eliminó la dependencia 'Depends(login_required)'
+    # También se eliminó el bloque que verificaba al usuario
+    # if not isinstance(username, str):
+    #     return username
     return templates.TemplateResponse('stock.html', {"request": request})
 
 @app.get("/api/picking/order/{order_number}/{despatch_number}")
