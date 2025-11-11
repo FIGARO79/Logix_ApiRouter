@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, status, File
 from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse, JSONResponse
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -61,6 +62,12 @@ app.add_middleware(
     allow_methods=["*"],  # Permite todos los métodos (POST, GET, etc).
     allow_headers=["*"],  # Permite todas las cabeceras.
 )
+
+# ProxyHeadersMiddleware ayuda a que `request.url.scheme` y las cabeceras originales
+# (X-Forwarded-For, X-Forwarded-Proto) sean procesadas correctamente cuando la app
+# está detrás de un proxy (por ejemplo PythonAnywhere). Debe añadirse antes del
+# middleware que usa esas cabeceras.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # --- Middleware CORREGIDO para forzar HTTPS y manejar 'scheme' ---
 class SchemeMiddleware(BaseHTTPMiddleware):
