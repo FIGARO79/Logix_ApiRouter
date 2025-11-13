@@ -1720,7 +1720,7 @@ async def set_password_post(request: Request, token: str = Form(...), new_passwo
     query_string = urlencode({'message': 'Contraseña actualizada con éxito. Por favor inicie sesión.'})
     return RedirectResponse(url=f'/login?{query_string}', status_code=status.HTTP_302_FOUND)
 
-@app.post('/admin/reset_count_sessions/{user_id}')
+@app.post('/admin/reset_count_sessions/{user_id}', name='reset_count_sessions')
 async def reset_count_sessions(user_id: int, request: Request):
     if not request.cookies.get("admin_logged_in"):
         return RedirectResponse(url=str(request.url.replace(path='/admin/users', query='')), status_code=status.HTTP_302_FOUND)
@@ -1735,13 +1735,14 @@ async def reset_count_sessions(user_id: int, request: Request):
 
             if session_ids:
                 # Delete all stock_counts associated with those session_ids
-                await conn.execute(f"DELETE FROM stock_counts WHERE session_id IN ({','.join(['?']*len(session_ids))})", session_ids)
+                placeholders = ','.join(['?' for _ in session_ids])
+                await conn.execute(f"DELETE FROM stock_counts WHERE session_id IN ({placeholders})", session_ids)
 
             # Now, delete the count_sessions for the user
             await conn.execute("DELETE FROM count_sessions WHERE user_username = ?", (user[0],))
             await conn.commit()
     
-    return RedirectResponse(url=str(request.url.replace(path='/admin/users', query='message=Sesiones de conteo reseteadas')), status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url='/admin/users', status_code=status.HTTP_302_FOUND)
 
 @app.get('/admin/logout')
 async def admin_logout(request: Request):
