@@ -1496,7 +1496,7 @@ async def register_post(request: Request, username: str = Form(...), password: s
     query_string = urlencode({'message': 'Registro exitoso. Pendiente de aprobación.'})
     return RedirectResponse(url=f'/login?{query_string}', status_code=status.HTTP_302_FOUND)
 
-@app.get('/login', response_class=HTMLResponse)
+@app.get('/login', response_class=HTMLResponse, name='login')
 def login_get(request: Request):
     if get_current_user(request):
         return RedirectResponse(url='/', status_code=status.HTTP_302_FOUND)
