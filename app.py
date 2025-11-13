@@ -1615,6 +1615,13 @@ async def reset_password(user_id: int, request: Request):
         return RedirectResponse(url=str(request.url.replace(path='/admin/users', query='error=Usuario no encontrado')), status_code=status.HTTP_302_FOUND)
     
     username = user[0]
+    # Invalidar la contraseña actual (para que la antigua deje de funcionar)
+    temp_invalid = secrets.token_urlsafe(32)
+    hashed_invalid_for_user = generate_password_hash(temp_invalid)
+    async with aiosqlite.connect(DB_FILE_PATH) as conn:
+        await conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed_invalid_for_user, user_id))
+        await conn.commit()
+
     # Generar token de un solo uso y almacenarlo con expiración
     token = secrets.token_urlsafe(32)
     expires_at = (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).isoformat()
