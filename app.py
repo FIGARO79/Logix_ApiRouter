@@ -865,8 +865,17 @@ async def stock_item(item_code: str):
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
 
 @app.get('/api/get_item_details/{item_code}')
-async def get_item_details_for_label(item_code: str):
-# ... (código existente) ...
+async def get_item_details_for_label(item_code: str, username: str = Depends(login_required)):
+    details = await get_item_details_from_master_csv(item_code)
+    if details:
+        response_data = {
+            'item_code': details.get('Item_Code'),
+            'description': details.get('Item_Description'),
+            'bin_location': details.get('Bin_1'),
+            'additional_bins': details.get('Aditional_Bin_Location'),
+            'weight_kg': details.get('Weight_per_Unit')
+        }
+        return JSONResponse(content=response_data)
     else:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
 
