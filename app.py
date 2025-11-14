@@ -866,21 +866,48 @@ async def stock_item(item_code: str):
 
 @app.get('/api/get_item_details/{item_code}')
 async def get_item_details_for_label(item_code: str):
-    details = await get_item_details_from_master_csv(item_code)
-    if details:
-        response_data = {
-            'item_code': details.get('Item_Code'),
-            'description': details.get('Item_Description'),
-            'bin_location': details.get('Bin_1'),
-            'additional_bins': details.get('Aditional_Bin_Location'),
-            'weight_kg': details.get('Weight_per_Unit')
-        }
-        return JSONResponse(content=response_data)
+# ... (código existente) ...
     else:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
 
+
 @app.get('/api/get_item_for_counting/{item_code}')
 async def get_item_for_counting(item_code: str, username: str = Depends(login_required)):
+    
+    current_stage = 1 # Default
+    
+    # 1. Obtener la sesión activa del usuario y su etapa
+    async with aiosqlite.connect(DB_FILE_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT inventory_stage FROM count_sessions WHERE user_username = ? AND status = 'in_progress' ORDER BY start_time DESC LIMIT 1",
+            (username,)
+        )
+        active_session = await cursor.fetchone()
+    
+    if not active_session:
+        raise HTTPException(status_code=403, detail="No tienes una sesión de conteo activa. Inicia una nueva sesión.")
+        
+    current_stage = active_session['inventory_stage']
+    print(f"User {username} counting item {item_code} for stage {current_stage}")
+
+    # 2. Aplicar lógica de etapa
+    if current_stage > 1:
+        # Es un reconteo, verificar si el item está en la lista de tareas
+        async with aiosqlite.connect(DB_FILE_PATH) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor_recount = await conn.execute(
+                # Verificamos si el item existe en la lista para esta etapa (independiente de su status)
+                "SELECT 1 FROM recount_list WHERE item_code = ? AND stage_to_count = ?",
+                (item_code, current_stage)
+            )
+            item_in_list = await cursor_recount.fetchone()
+            
+        if not item_in_list:
+            print(f"RECHAZADO: Item {item_code} no está en la lista de reconteo para la etapa {current_stage}.")
+            raise HTTPException(status_code=404, detail=f"Item no requerido. Este item no está en la lista de reconteo para la Etapa {current_stage}.")
+
+    # 3. Si es Etapa 1 O el item está en la lista, obtener detalles (lógica original)
     details = await get_item_details_from_master_csv(item_code)
     if details:
         # Inventario ciego - no devolvemos cantidad de stock
@@ -891,34 +918,53 @@ async def get_item_for_counting(item_code: str, username: str = Depends(login_re
         }
         return JSONResponse(content=response_data)
     else:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Artículo no encontrado en el maestro de items.")
 
 @app.post('/api/save_count')
 async def save_count(data: StockCount, username: str = Depends(login_required)):
-    """Guarda un conteo de stock, verificando que la sesión y la ubicación estén activas."""
+    """Guarda un conteo de stock, verificando la sesión, la etapa y la ubicación."""
     try:
         async with aiosqlite.connect(DB_FILE_PATH) as conn:
             conn.row_factory = aiosqlite.Row
-            # 1. Verificar que la sesión está activa y pertenece al usuario
+            
+            # 1. Verificar que la sesión está activa y obtener su etapa
             cursor = await conn.execute(
-                "SELECT id FROM count_sessions WHERE id = ? AND user_username = ? AND status = 'in_progress'",
+                "SELECT id, inventory_stage FROM count_sessions WHERE id = ? AND user_username = ? AND status = 'in_progress'",
                 (data.session_id, username)
             )
-            if not await cursor.fetchone():
+            active_session = await cursor.fetchone()
+            
+            if not active_session:
                 raise HTTPException(status_code=403, detail="La sesión de conteo no es válida, está cerrada o no te pertenece.")
+            
+            current_stage = active_session['inventory_stage']
+            print(f"User {username} saving item {data.item_code} for stage {current_stage}")
 
-            # 2. Verificar que la ubicación no esté cerrada para esta sesión
-            cursor = await conn.execute(
+            # --- NUEVA VALIDACIÓN DE ETAPA ---
+            if current_stage > 1:
+                # Es un reconteo, verificar si el item está en la lista de tareas
+                cursor_recount = await conn.execute(
+                    "SELECT 1 FROM recount_list WHERE item_code = ? AND stage_to_count = ?",
+                    (data.item_code, current_stage)
+                )
+                item_in_list = await cursor_recount.fetchone()
+                
+                if not item_in_list:
+                    print(f"RECHAZADO (SAVE): Item {data.item_code} no está en la lista de reconteo para la etapa {current_stage}.")
+                    raise HTTPException(status_code=400, detail=f"Item no requerido. Este item no está en la lista de reconteo (Etapa {current_stage}).")
+            # --- FIN NUEVA VALIDACIÓN ---
+
+            # 2. (Original) Verificar que la ubicación no esté cerrada para esta sesión
+            cursor_loc = await conn.execute(
                 "SELECT status FROM session_locations WHERE session_id = ? AND location_code = ?",
                 (data.session_id, data.counted_location)
             )
-            location_status = await cursor.fetchone()
+            location_status = await cursor_loc.fetchone()
             if location_status and location_status['status'] == 'closed':
                 raise HTTPException(status_code=400, detail=f"La ubicación {data.counted_location} ya está cerrada y no se puede modificar.")
 
-            # 3. Insertar el conteo
+            # 3. (Original) Insertar el conteo
             counted_qty = int(data.counted_qty)
-            # Para inventario ciego, no usamos system_qty ni calculamos difference
             await conn.execute(
                 '''
                 INSERT INTO stock_counts (session_id, timestamp, item_code, item_description, counted_qty, counted_location, bin_location_system, username)
@@ -929,6 +975,9 @@ async def save_count(data: StockCount, username: str = Depends(login_required)):
                     data.description, counted_qty, data.counted_location, data.bin_location_system, username
                 )
             )
+            
+            # (Quitamos la lógica de UPDATE recount_list, eso lo hará el admin al cerrar la etapa)
+            
             await conn.commit()
         return JSONResponse(content={'message': 'Conteo guardado con éxito'}, status_code=201)
     except (ValueError, TypeError):
