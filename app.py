@@ -1109,7 +1109,14 @@ def update_files_get(request: Request, username: str = Depends(login_required)):
     return templates.TemplateResponse("update.html", {"request": request, "error": request.query_params.get('error'), "message": request.query_params.get('message')})
 
 @app.post('/update', response_class=JSONResponse)
-async def update_files_post(request: Request, item_master: UploadFile = File(None), grn_file: UploadFile = File(None), picking_file: UploadFile = File(None), username: str = Depends(login_required)):
+async def update_files_post(
+    request: Request, 
+    item_master: UploadFile = File(None), 
+    grn_file: UploadFile = File(None), 
+    picking_file: UploadFile = File(None),
+    update_option_280: str = Form(None),  # Opción para el archivo 280
+    username: str = Depends(login_required)
+):
     if not isinstance(username, str):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "Unauthorized"})
     
@@ -1117,6 +1124,7 @@ async def update_files_post(request: Request, item_master: UploadFile = File(Non
     message = ""
     error = ""
 
+    # Manejo del maestro de items (sin cambios)
     if item_master and item_master.filename:
         if item_master.filename == os.path.basename(ITEM_MASTER_CSV_PATH):
             with open(ITEM_MASTER_CSV_PATH, "wb") as buffer:
@@ -1126,18 +1134,44 @@ async def update_files_post(request: Request, item_master: UploadFile = File(Non
         else:
             error += f'Nombre incorrecto para maestro de items. Se esperaba "{os.path.basename(ITEM_MASTER_CSV_PATH)}". '
 
+    # Manejo del archivo GRN (con lógica de combinar/reemplazar)
     if grn_file and grn_file.filename:
         if grn_file.filename == os.path.basename(GRN_CSV_FILE_PATH):
-            with open(GRN_CSV_FILE_PATH, "wb") as buffer:
-                shutil.copyfileobj(grn_file.file, buffer)
-            message += f'Archivo "{grn_file.filename}" actualizado. '
-            files_uploaded = True
+            try:
+                # Opción de combinar los archivos CSV
+                if update_option_280 == 'combine':
+                    # Leer el archivo subido en un DataFrame
+                    new_data_df = pd.read_csv(grn_file.file)
+                    
+                    # Si el archivo existente está, leerlo y combinarlo
+                    if os.path.exists(GRN_CSV_FILE_PATH):
+                        existing_data_df = pd.read_csv(GRN_CSV_FILE_PATH)
+                        combined_df = pd.concat([existing_data_df, new_data_df], ignore_index=True)
+                    else:
+                        # Si no hay archivo existente, el nuevo es el combinado
+                        combined_df = new_data_df
+                    
+                    # Guardar el DataFrame combinado
+                    combined_df.to_csv(GRN_CSV_FILE_PATH, index=False)
+                    message += f'Archivo "{grn_file.filename}" combinado con éxito. '
+                
+                # Opción de reemplazar (comportamiento por defecto)
+                else:
+                    with open(GRN_CSV_FILE_PATH, "wb") as buffer:
+                        shutil.copyfileobj(grn_file.file, buffer)
+                    message += f'Archivo "{grn_file.filename}" reemplazado con éxito. '
+                
+                files_uploaded = True
+            except Exception as e:
+                error += f'Error procesando el archivo GRN: {str(e)}. '
         else:
             error += f'Nombre incorrecto para archivo GRN. Se esperaba "{os.path.basename(GRN_CSV_FILE_PATH)}". '
 
+    # Manejo del archivo de picking (sin cambios)
     if picking_file and picking_file.filename:
         if picking_file.filename == 'AURRSGLBD0240 - Unconfirmed Picking Notes.csv':
-            with open(os.path.join(DATABASE_FOLDER, 'AURRSGLBD0240 - Unconfirmed Picking Notes.csv'), "wb") as buffer:
+            picking_path = os.path.join(DATABASE_FOLDER, 'AURRSGLBD0240 - Unconfirmed Picking Notes.csv')
+            with open(picking_path, "wb") as buffer:
                 shutil.copyfileobj(picking_file.file, buffer)
             message += f'Archivo "{picking_file.filename}" actualizado. '
             files_uploaded = True

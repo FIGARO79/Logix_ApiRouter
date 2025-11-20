@@ -161,6 +161,26 @@
 
                         <div id="file-list" class="mt-4"></div>
 
+                        <!-- Opciones para el archivo 280 -->
+                        <div id="update-options-280" class="hidden mt-4 p-4 border border-gray-200 rounded-lg">
+                            <p class="font-medium text-gray-700">Opción de actualización para el archivo 280:</p>
+                            <div class="flex items-center gap-x-6 mt-2">
+                                <div class="flex items-center">
+                                    <input id="option-replace" name="update_option_280" type="radio" value="replace" checked
+                                        class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <label for="option-replace"
+                                        class="ml-2 block text-sm font-medium leading-6 text-gray-900">Reemplazar</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input id="option-combine" name="update_option_280" type="radio" value="combine"
+                                        class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <label for="option-combine"
+                                        class="ml-2 block text-sm font-medium leading-6 text-gray-900">Combinar</label>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">"Reemplazar" borra los datos anteriores. "Combinar" añade los nuevos datos a los existentes.</p>
+                        </div>
+
                     </div>
 
                     <button type="submit"
@@ -301,7 +321,11 @@
 
             function renderFileList() {
                 fileList.innerHTML = '';
+                let file280Exists = false;
                 filesToUpload.forEach((file, index) => {
+                    if (file.name === 'AURRSGLBD0280 - Stock In Goods Inwards And Inspection.csv') {
+                        file280Exists = true;
+                    }
                     const fileElement = document.createElement('div');
                     fileElement.className = 'flex items-center justify-between p-2 bg-gray-100 rounded-md';
                     fileElement.innerHTML = `
@@ -310,6 +334,14 @@
                     `;
                     fileList.appendChild(fileElement);
                 });
+
+                // Show/hide the update options for file 280
+                const updateOptionsContainer = document.getElementById('update-options-280');
+                if (file280Exists) {
+                    updateOptionsContainer.classList.remove('hidden');
+                } else {
+                    updateOptionsContainer.classList.add('hidden');
+                }
 
                 // Add event listeners to remove buttons
                 fileList.querySelectorAll('button').forEach(button => {
@@ -329,16 +361,24 @@
                 }
 
                 const formData = new FormData();
+                let file280Exists = false;
 
                 filesToUpload.forEach(file => {
                     if (file.name === 'AURRSGLBD0250 - Item Stockroom Balance.csv') {
                         formData.append('item_master', file);
                     } else if (file.name === 'AURRSGLBD0280 - Stock In Goods Inwards And Inspection.csv') {
                         formData.append('grn_file', file);
+                        file280Exists = true;
                     } else if (file.name === 'AURRSGLBD0240 - Unconfirmed Picking Notes.csv') {
                         formData.append('picking_file', file);
                     }
                 });
+
+                // Append the update option for file 280 if it exists
+                if (file280Exists) {
+                    const updateOption = document.querySelector('input[name="update_option_280"]:checked').value;
+                    formData.append('update_option_280', updateOption);
+                }
 
                 try {
                     const response = await fetch('/update', {
