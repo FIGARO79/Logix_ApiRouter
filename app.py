@@ -1549,37 +1549,20 @@ async def get_count_stats(username: str = Depends(login_required)):
     try:
         async with aiosqlite.connect(DB_FILE_PATH) as conn:
             conn.row_factory = aiosqlite.Row
-            
-            # --- NUEVO: Obtener etapa actual ---
-            cursor = await conn.execute("SELECT value FROM app_state WHERE key = 'current_inventory_stage'")
-            stage_row = await cursor.fetchone()
-            current_stage = int(stage_row['value']) if stage_row else 1
-            
-            # --- NUEVO: Filtrar consultas por la etapa actual ---
-            
-            # 1. Total de ubicaciones contadas (en esta etapa)
-            cursor = await conn.execute(
-                """
-                SELECT COUNT(DISTINCT sc.counted_location) 
-                FROM stock_counts sc
-                JOIN count_sessions cs ON sc.session_id = cs.id
-                WHERE cs.inventory_stage = ?
-                """, (current_stage,)
-            )
-            counted_locations = (await cursor.fetchone())[0]
 
-            # 2. Total de items contados (grupos de item/ubicación) (en esta etapa)
+            # 1. Total de ubicaciones contadas (global)
             cursor = await conn.execute(
-                """
-                SELECT COUNT(*) FROM (
-                    SELECT DISTINCT sc.item_code, sc.counted_location 
-                    FROM stock_counts sc
-                    JOIN count_sessions cs ON sc.session_id = cs.id
-                    WHERE cs.inventory_stage = ?
-                )
-                """, (current_stage,)
+                "SELECT COUNT(DISTINCT counted_location) FROM stock_counts"
             )
-            total_items_counted = (await cursor.fetchone())[0]
+            counted_locations_row = await cursor.fetchone()
+            counted_locations = counted_locations_row[0] if counted_locations_row else 0
+
+            # 2. Total de items contados (grupos de item/ubicación, global)
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT item_code, counted_location FROM stock_counts)"
+            )
+            total_items_counted_row = await cursor.fetchone()
+            total_items_counted = total_items_counted_row[0] if total_items_counted_row else 0
 
             # 3. Total de items con stock (del maestro de items)
             total_items_with_stock = 0
@@ -1588,68 +1571,57 @@ async def get_count_stats(username: str = Depends(login_required)):
                     if qty is not None and qty > 0:
                         total_items_with_stock += 1
             
-            # 4. Items con diferencias (en esta etapa)
-            cursor = await conn.execute(
-                """
-                SELECT sc.item_code, sc.counted_qty 
-                FROM stock_counts sc
-                JOIN count_sessions cs ON sc.session_id = cs.id
-                WHERE cs.inventory_stage = ?
-                """, (current_stage,)
-            )
-            all_counts_stage = await cursor.fetchall()
-            
+            # 4. Items con diferencias (global)
+            query = """
+                SELECT 
+                    item_code, 
+                    SUM(counted_qty) as total_counted
+                FROM 
+                    stock_counts
+                GROUP BY 
+                    item_code
+            """
+            cursor = await conn.execute(query)
+            all_counted_items = await cursor.fetchall()
+            counted_qty_map = {item['item_code']: item['total_counted'] for item in all_counted_items}
+
+            counted_item_codes = set(counted_qty_map.keys())
+            master_item_codes = set(master_qty_map.keys())
+            all_item_codes = counted_item_codes.union(master_item_codes)
+
             items_with_differences = 0
-            processed_items_stage = set()
-
-            for count in all_counts_stage:
-                item_code = count['item_code']
-                if item_code not in processed_items_stage:
-                    system_qty_raw = master_qty_map.get(item_code)
-                    system_qty = 0
-                    if system_qty_raw is not None:
-                        try:
-                            system_qty = int(float(system_qty_raw))
-                        except (ValueError, TypeError):
-                            system_qty = 0
-                    
-                    # Sumar todos los conteos para este item_code (SOLO en esta etapa)
-                    cursor = await conn.execute(
-                        """
-                        SELECT SUM(sc.counted_qty) 
-                        FROM stock_counts sc
-                        JOIN count_sessions cs ON sc.session_id = cs.id
-                        WHERE sc.item_code = ? AND cs.inventory_stage = ?
-                        """, (item_code, current_stage)
-                    )
-                    total_counted_for_item = (await cursor.fetchone())[0]
-
-                    if total_counted_for_item != system_qty:
+            for item_code in all_item_codes:
+                total_counted = counted_qty_map.get(item_code, 0)
+                
+                system_qty_raw = master_qty_map.get(item_code)
+                system_qty = 0
+                if system_qty_raw is not None:
+                    try:
+                        system_qty = int(float(system_qty_raw))
+                    except (ValueError, TypeError):
+                        system_qty = 0
+                
+                if system_qty > 0 or total_counted > 0:
+                    if total_counted != system_qty:
                         items_with_differences += 1
-                    
-                    processed_items_stage.add(item_code)
 
-            # 5. Ubicaciones con stock (contadas en esta etapa)
+            # 5. Ubicaciones con stock (contadas, global)
             cursor = await conn.execute(
-                """
-                SELECT COUNT(DISTINCT sc.counted_location) 
-                FROM stock_counts sc
-                JOIN count_sessions cs ON sc.session_id = cs.id
-                WHERE cs.inventory_stage = ? AND sc.counted_qty > 0
-                """, (current_stage,)
+                "SELECT COUNT(DISTINCT counted_location) FROM stock_counts WHERE counted_qty > 0"
             )
-            locations_with_stock = (await cursor.fetchone())[0]
+            locations_with_stock_row = await cursor.fetchone()
+            locations_with_stock = locations_with_stock_row[0] if locations_with_stock_row else 0
 
             # 6. Total de ubicaciones con stock (del maestro de items)
             total_locations_with_stock = 0
-            if df_master_cache is not None:
+            if df_master_cache is not None and not df_master_cache.empty:
                 stock_items = df_master_cache[pd.to_numeric(df_master_cache['Physical_Qty'], errors='coerce').fillna(0) > 0]
-                bin_1_locations = stock_items['Bin_1'].dropna().unique()
-                total_locations_with_stock = len(bin_1_locations)
+                if not stock_items.empty:
+                    bin_1_locations = stock_items['Bin_1'].dropna().unique()
+                    total_locations_with_stock = len(bin_1_locations)
 
-            # --- NUEVO: Añadir 'current_stage' a la respuesta ---
             return JSONResponse(content={
-                "current_stage": current_stage, 
+                "current_stage": "all",
                 "total_items_with_stock": total_items_with_stock,
                 "counted_locations": counted_locations,
                 "total_items_counted": total_items_counted,
