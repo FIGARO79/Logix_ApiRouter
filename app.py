@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 import datetime
 import numpy as np
 import sqlite3
@@ -121,11 +122,9 @@ templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
 # Helper para generar URLs seguras en producción (HTTPS)
 def secure_url_for(request: Request, name: str, **path_params):
-    """Genera URLs que usan HTTPS en producción y HTTP en desarrollo."""
+    """Genera URLs que usan HTTPS si el scheme de la solicitud es https."""
     url = request.url_for(name, **path_params)
-    # Si estamos en producción (PYTHONANYWHERE), fuerza HTTPS
-    is_production = os.environ.get('PYTHONANYWHERE_DOMAIN')
-    if is_production and str(url).startswith('http://'):
+    if request.scope.get('scheme') == 'https' and str(url).startswith('http://'):
         url = str(url).replace('http://', 'https://', 1)
     return url
 
