@@ -12,7 +12,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.middleware.proxy_fix import ProxyFix
 import datetime
 import numpy as np
 import sqlite3
@@ -81,7 +80,7 @@ class SchemeMiddleware(BaseHTTPMiddleware):
         
         # Si la cabecera 'x-forwarded-proto' existe, esa es la verdad.
         if "x-forwarded-proto" in request.headers:
-            scheme = request.headers["x-forwarded-proto"].lower()
+            scheme = request.headers['x-forwarded-proto']
         
         # 2. Forzar HTTPS *solo* en producción (PythonAnywhere)
         is_production = os.environ.get('PYTHONANYWHERE_DOMAIN')
@@ -120,22 +119,15 @@ app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_ROOT, "static"))
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Asegúrate que esta línea está antes
 templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
-# Helper para generar URLs relativas (Funciona en Local y Producción automáticamente)
+# Helper para generar URLs seguras en producción (HTTPS)
 def secure_url_for(request: Request, name: str, **path_params):
-    """
-    Genera una URL relativa (solo el path).
-    Al devolver '/admin/inventory' en lugar de 'http://dominio/admin...',
-    el navegador respeta automáticamente el HTTPS de producción.
-    """
-    # 1. Obtenemos el objeto URL de FastAPI
-    url_obj = request.url_for(name, **path_params)
-    
-    # 2. Extraemos solo la parte del path (ruta) y la query string
-    path = url_obj.path
-    if url_obj.query:
-        path += f"?{url_obj.query}"
-        
-    return path
+    """Genera URLs que usan HTTPS en producción y HTTP en desarrollo."""
+    url = request.url_for(name, **path_params)
+    # Si estamos en producción (PYTHONANYWHERE), fuerza HTTPS
+    is_production = os.environ.get('PYTHONANYWHERE_DOMAIN')
+    if is_production and str(url).startswith('http://'):
+        url = str(url).replace('http://', 'https://', 1)
+    return url
 
 # Hacer el helper disponible en todas las plantillas Jinja2
 templates.env.globals['secure_url_for'] = secure_url_for
@@ -1933,12 +1925,10 @@ async def start_inventory_stage_1(request: Request, admin: bool = Depends(admin_
             await conn.commit()
         
         query_params = urlencode({"message": "Inventario reiniciado en Etapa 1. Todos los datos y contadores han sido reseteados."})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
     except aiosqlite.Error as e:
         query_params = urlencode({"error": f"Error de base de datos: {e}"})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
 
 @app.post('/admin/inventory/advance/{next_stage}', name='advance_inventory_stage')
 async def advance_inventory_stage(request: Request, next_stage: int, admin: bool = Depends(admin_login_required)):
@@ -1997,17 +1987,14 @@ async def advance_inventory_stage(request: Request, next_stage: int, admin: bool
 
         message = f"Proceso completado. Etapa de inventario avanzada a {next_stage}. Se encontraron {len(items_for_recount)} items con diferencias."
         query_params = urlencode({"message": message})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
 
     except aiosqlite.Error as e:
         query_params = urlencode({"error": f"Error de base de datos: {e}"})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
     except Exception as e:
         query_params = urlencode({"error": f"Error inesperado: {e}"})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
 
 @app.post('/admin/inventory/finalize', name='finalize_inventory')
 async def finalize_inventory(request: Request, admin: bool = Depends(admin_login_required)):
@@ -2021,12 +2008,11 @@ async def finalize_inventory(request: Request, admin: bool = Depends(admin_login
             await conn.commit()
         
         query_params = urlencode({"message": "Ciclo de inventario finalizado y cerrado."})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
     except aiosqlite.Error as e:
         query_params = urlencode({"error": f"Error de base de datos: {e}"})
-        redirect_url = secure_url_for(request, 'admin_inventory') + f"?{query_params}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
+
 
 
 @app.get('/admin/login', response_class=HTMLResponse, name='admin_login_get')
