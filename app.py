@@ -119,15 +119,26 @@ app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_ROOT, "static"))
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Asegúrate que esta línea está antes
 templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
-# Helper para generar URLs seguras en producción (HTTPS)
+#--- Helper para generar URLs seguras ---
+
 def secure_url_for(request: Request, name: str, **path_params):
-    """Genera URLs que usan HTTPS en producción y HTTP en desarrollo."""
+    """Genera URLs forzando HTTPS si estamos en PythonAnywhere."""
     url = request.url_for(name, **path_params)
-    # Si estamos en producción (PYTHONANYWHERE), fuerza HTTPS
-    is_production = os.environ.get('PYTHONANYWHERE_DOMAIN')
-    if is_production and str(url).startswith('http://'):
-        url = str(url).replace('http://', 'https://', 1)
-    return url
+    url_str = str(url)
+    
+    # 1. Detectar si estamos en PythonAnywhere mirando el host
+    host = request.headers.get('host', '')
+    
+    # 2. Detectar si viene de un proxy seguro (headers estándar)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+    
+    # CRITERIO: Si el host es de pythonanywhere O el proxy dice https...
+    if 'pythonanywhere.com' in host or forwarded_proto == 'https':
+        # ...Y la URL generada dice http, la cambiamos a https a la fuerza.
+        if url_str.startswith('http://'):
+            url_str = url_str.replace('http://', 'https://', 1)
+            
+    return url_str  
 
 # Hacer el helper disponible en todas las plantillas Jinja2
 templates.env.globals['secure_url_for'] = secure_url_for
