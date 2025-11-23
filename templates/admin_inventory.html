@@ -132,6 +132,14 @@
                         <h3 class="font-bold text-lg text-green-800">Finalizar Ciclo de Inventario</h3>
                         <p class="text-sm text-gray-600 mb-3">Marca el ciclo de inventario como completado. Esto
                             permitirá iniciar un nuevo ciclo en el futuro.</p>
+                        
+                        {% if stage.value == '4' %}
+                        <a href="{{ secure_url_for(request, 'generate_inventory_report') }}"
+                           class="w-full block text-center bg-teal-600 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded mb-3">
+                           Generar Informe de Conteos
+                        </a>
+                        {% endif %}
+
                         <form action="{{ secure_url_for(request, 'finalize_inventory') }}" method="post"
                             onsubmit="return confirm('¿Estás seguro de que quieres finalizar y cerrar el ciclo de inventario actual?');">
                             <button type="submit"

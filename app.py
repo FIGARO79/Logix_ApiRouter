@@ -2025,6 +2025,110 @@ async def finalize_inventory(request: Request, admin: bool = Depends(admin_login
         return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
 
 
+@app.get('/admin/inventory/report', name='generate_inventory_report')
+async def generate_inventory_report(request: Request, admin: bool = Depends(admin_login_required)):
+    if not admin:
+        return RedirectResponse(url='/admin/login', status_code=status.HTTP_302_FOUND)
+
+    try:
+        async with aiosqlite.connect(DB_FILE_PATH) as conn:
+            conn.row_factory = aiosqlite.Row
+            # Get all counts from all stages of the current inventory cycle
+            query = """
+                SELECT
+                    sc.item_code,
+                    sc.item_description,
+                    cs.inventory_stage,
+                    sc.counted_qty
+                FROM stock_counts sc
+                JOIN count_sessions cs ON sc.session_id = cs.id
+            """
+            all_counts_df = await conn.run_sync(lambda sync_conn: pd.read_sql_query(query, sync_conn))
+
+        if all_counts_df.empty:
+            query_params = urlencode({"error": "No hay datos de conteo para generar un informe."})
+            return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
+
+        # Agrupar por item y etapa, sumando las cantidades
+        stage_counts = all_counts_df.groupby(['item_code', 'item_description', 'inventory_stage'])['counted_qty'].sum().reset_index()
+
+        # Pivotar la tabla para tener las etapas como columnas
+        pivot_df = stage_counts.pivot_table(
+            index=['item_code', 'item_description'],
+            columns='inventory_stage',
+            values='counted_qty',
+            aggfunc='sum'
+        ).fillna(0)
+
+        # Renombrar columnas a "Conteo Etapa X"
+        pivot_df.columns = [f'Conteo Etapa {int(col)}' for col in pivot_df.columns]
+        
+        # Obtener la cantidad del sistema del master_qty_map
+        system_qtys = pd.Series(master_qty_map, name='Cantidad Sistema').astype('float64').fillna(0)
+        
+        # Unir los datos pivotados con las cantidades del sistema
+        report_df = pivot_df.join(system_qtys, on='item_code').fillna(0)
+        report_df.rename_axis(index={'item_code': 'Item Code', 'item_description': 'Description'}, inplace=True)
+        report_df.reset_index(inplace=True)
+
+        # Determinar la cantidad final contada.
+        # La lógica es: el conteo de la etapa más alta para un item es el que vale.
+        report_df['Cantidad Final Contada'] = 0
+        if 'Conteo Etapa 4' in report_df.columns:
+            report_df['Cantidad Final Contada'] = np.where(report_df['Conteo Etapa 4'] != 0, report_df['Conteo Etapa 4'], report_df['Cantidad Final Contada'])
+        if 'Conteo Etapa 3' in report_df.columns:
+            report_df['Cantidad Final Contada'] = np.where(report_df['Conteo Etapa 3'] != 0, report_df['Conteo Etapa 3'], report_df['Cantidad Final Contada'])
+        if 'Conteo Etapa 2' in report_df.columns:
+            report_df['Cantidad Final Contada'] = np.where(report_df['Conteo Etapa 2'] != 0, report_df['Conteo Etapa 2'], report_df['Cantidad Final Contada'])
+        if 'Conteo Etapa 1' in report_df.columns:
+            report_df['Cantidad Final Contada'] = np.where(report_df['Conteo Etapa 1'] != 0, report_df['Conteo Etapa 1'], report_df['Cantidad Final Contada'])
+        
+        # Si un item se contó en etapa 1 y luego en la 2 (conteo 0), la lógica anterior falla.
+        # La correcta es ir de la etapa más alta a la más baja.
+        final_qty = pd.Series(0, index=report_df.index)
+        for stage in sorted([int(c.split()[-1]) for c in pivot_df.columns], reverse=True):
+            stage_col = f'Conteo Etapa {stage}'
+            final_qty = np.where(final_qty == 0, report_df.get(stage_col, 0), final_qty)
+        report_df['Cantidad Final Contada'] = final_qty
+
+
+        report_df['Diferencia Final'] = report_df['Cantidad Final Contada'] - report_df['Cantidad Sistema']
+
+        # Ordenar columnas
+        cols = ['Item Code', 'Description', 'Cantidad Sistema']
+        stage_cols = sorted([col for col in report_df.columns if 'Conteo Etapa' in col])
+        final_cols = ['Cantidad Final Contada', 'Diferencia Final']
+        report_df = report_df[cols + stage_cols + final_cols]
+
+        # Convertir a enteros
+        for col in report_df.columns:
+            if 'Cantidad' in col or 'Conteo' in col or 'Diferencia' in col:
+                report_df[col] = report_df[col].astype(int)
+
+        # Generar el archivo Excel
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            report_df.to_excel(writer, index=False, sheet_name='InformeFinalInventario')
+            worksheet = writer.sheets['InformeFinalInventario']
+            for i, col_name in enumerate(report_df.columns):
+                column_letter = get_column_letter(i + 1)
+                max_len = max(report_df[col_name].astype(str).map(len).max(), len(col_name)) + 2
+                worksheet.column_dimensions[column_letter].width = max_len
+        
+        output.seek(0)
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"informe_final_inventario_{timestamp_str}.xlsx"
+        return Response(
+            content=output.getvalue(),
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        print(f"Error generando el informe de inventario: {e}")
+        query_params = urlencode({"error": f"No se pudo generar el informe: {str(e)}"})
+        return RedirectResponse(url=f"/admin/inventory?{query_params}", status_code=status.HTTP_302_FOUND)
+
 
 @app.get('/admin/login', response_class=HTMLResponse, name='admin_login_get')
 def admin_login_get(request: Request):
