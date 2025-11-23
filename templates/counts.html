@@ -222,6 +222,19 @@
     <main class="container-wrapper mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Session Control -->
         <div id="session-control-container" class="bg-white p-6 rounded-lg shadow text-center">
+            {% if etapa_conteo_actual == 0 %}
+            <h2 class="text-xl font-semibold text-red-700">Conteo no iniciado por Administrador</h2>
+            <p class="text-gray-500 mt-2">No es posible iniciar una sesión de conteo porque el administrador aún no ha generado la <strong>Etapa 1</strong>.</p>
+            <p class="text-gray-500 mt-1">Por favor, contacta al administrador.</p>
+            <button id="start-session-btn" class="btn btn-primary mt-4" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                        clip-rule="evenodd" />
+                </svg>
+                <span>Iniciar Nueva Sesión de Conteo</span>
+            </button>
+            {% else %}
             <h2 class="text-xl font-semibold text-gray-700">No hay ninguna sesión de conteo activa.</h2>
             <p class="text-gray-500 mt-2">Para empezar a contar, por favor inicia una nueva sesión.</p>
             <button id="start-session-btn" class="btn btn-primary mt-4">
@@ -232,6 +245,7 @@
                 </svg>
                 <span>Iniciar Nueva Sesión de Conteo</span>
             </button>
+            {% endif %}
         </div>
 
         <!-- Main Counting View (hidden by default) -->

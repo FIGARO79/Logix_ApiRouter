@@ -553,14 +553,21 @@ async def start_new_session(username: str = Depends(login_required)):
     """Inicia una nueva sesión de conteo para el usuario actual."""
     print(f"Attempting to start a new session for user: {username}")
     async with aiosqlite.connect(DB_FILE_PATH) as conn:
-        conn.row_factory = aiosqlite.Row # Añadir row_factory para leer la etapa
+        conn.row_factory = aiosqlite.Row
         try:
-            # --- NUEVO: Obtener la etapa de inventario global actual ---
+            # Obtener la etapa de inventario global actual
             cursor_stage = await conn.execute("SELECT value FROM app_state WHERE key = 'current_inventory_stage'")
             stage_row = await cursor_stage.fetchone()
-            current_stage = int(stage_row['value']) if (stage_row and stage_row['value']) else 1 # Default a 1
+            current_stage = int(stage_row['value']) if (stage_row and stage_row['value']) else 0
             print(f"Global inventory stage is: {current_stage}")
-            # --- FIN NUEVO ---
+
+            # --- VALIDACIÓN DE ETAPA ---
+            if current_stage == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No se puede iniciar sesión: El administrador aún no ha generado la Etapa 1 del inventario."
+                )
+            # --- FIN VALIDACIÓN ---
 
             # Opcional: Finalizar sesiones anteriores del mismo usuario
             print("Closing previous sessions...")
@@ -571,17 +578,15 @@ async def start_new_session(username: str = Depends(login_required)):
             print("Previous sessions closed.")
 
             # Crear nueva sesión
-            print(f"Creating new session for stage {current_stage}...") # Modificado
+            print(f"Creating new session for stage {current_stage}...")
             cursor = await conn.execute(
-                # --- MODIFICADO: Añadir inventory_stage ---
                 "INSERT INTO count_sessions (user_username, start_time, status, inventory_stage) VALUES (?, ?, ?, ?)",
                 (username, datetime.datetime.now().isoformat(timespec='seconds'), 'in_progress', current_stage)
             )
             await conn.commit()
             session_id = cursor.lastrowid
-            print(f"New session created with ID: {session_id} for stage {current_stage}") # Modificado
+            print(f"New session created with ID: {session_id} for stage {current_stage}")
             
-            # --- MODIFICADO: Devolver la etapa al frontend ---
             return {"session_id": session_id, "inventory_stage": current_stage, "message": f"Sesión {session_id} (Etapa {current_stage}) iniciada."}
         
         except aiosqlite.Error as e:
@@ -1276,10 +1281,17 @@ def label_page(request: Request):
     return templates.TemplateResponse('label.html', {"request": request})
 
 @app.get('/counts', response_class=HTMLResponse)
-def counts_page(request: Request, username: str = Depends(login_required)):
+async def counts_page(request: Request, username: str = Depends(login_required)):
     if not isinstance(username, str):
         return username
-    return templates.TemplateResponse('counts.html', {"request": request})
+    
+    async with aiosqlite.connect(DB_FILE_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT value FROM app_state WHERE key = 'current_inventory_stage'")
+        stage_row = await cursor.fetchone()
+        current_stage = int(stage_row['value']) if (stage_row and stage_row['value']) else 0
+        
+    return templates.TemplateResponse('counts.html', {"request": request, "etapa_conteo_actual": current_stage})
 
 @app.get('/stock', response_class=HTMLResponse)
 async def stock_page(request: Request): # <--- Se eliminó la dependencia 'Depends(login_required)'
