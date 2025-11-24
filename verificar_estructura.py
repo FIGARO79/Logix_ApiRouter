@@ -41,7 +41,6 @@ def main():
         ("app/routers/auth.py", "app.routers.auth"),
         ("app/routers/admin.py", "app.routers.admin"),
         ("app/routers/views.py", "app.routers.views"),
-        ("main.py", "main"),
     ]
     
     print("Verificando módulos...\n")
