@@ -5,7 +5,8 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # --- Configuración de Rutas ---
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# PROJECT_ROOT debe apuntar a la raíz del proyecto (dos niveles arriba de este archivo)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DATABASE_FOLDER = os.path.join(PROJECT_ROOT, 'databases')
 ITEM_MASTER_CSV_PATH = os.path.join(DATABASE_FOLDER, 'AURRSGLBD0250 - Item Stockroom Balance.csv')
