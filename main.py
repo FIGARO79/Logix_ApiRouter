@@ -5,13 +5,11 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 # Importar configuración
 from app.core.config import PROJECT_ROOT
 from app.middleware.security import SchemeMiddleware, HSTSMiddleware
-from app.utils.auth import secure_url_for
 
 # Importar servicios
 from app.services.database import init_db
@@ -45,10 +43,6 @@ app.add_middleware(HSTSMiddleware)
 
 # --- Montar archivos estáticos ---
 app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_ROOT, "static")), name="static")
-
-# --- Configuración de plantillas Jinja2 ---
-templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
-templates.env.globals['secure_url_for'] = secure_url_for
 
 # --- Registro de routers ---
 # Routers de API

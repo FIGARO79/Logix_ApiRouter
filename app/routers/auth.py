@@ -3,13 +3,10 @@ Router para endpoints de autenticación.
 """
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from app.utils.auth import create_user, verify_user, get_current_user, secure_url_for
-from app.core.config import PROJECT_ROOT
-import os
+from app.utils.auth import create_user, verify_user, get_current_user
+from app.core.templates import templates
 
 router = APIRouter(tags=["auth"])
-templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
 
 @router.get('/register', response_class=HTMLResponse)

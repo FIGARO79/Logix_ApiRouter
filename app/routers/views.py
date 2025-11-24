@@ -3,13 +3,10 @@ Router para vistas HTML principales.
 """
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from app.utils.auth import login_required
-from app.core.config import PROJECT_ROOT
-import os
+from app.core.templates import templates
 
 router = APIRouter(tags=["views"])
-templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
 
 @router.get('/', response_class=HTMLResponse)

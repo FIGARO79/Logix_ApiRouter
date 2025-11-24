@@ -3,13 +3,11 @@ Router para endpoints administrativos.
 """
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from app.utils.auth import get_all_users, approve_user_by_id, delete_user_by_id, reset_user_password
-from app.core.config import PROJECT_ROOT, UPDATE_PASSWORD
-import os
+from app.core.config import UPDATE_PASSWORD
+from app.core.templates import templates
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-templates = Jinja2Templates(directory=os.path.join(PROJECT_ROOT, "templates"))
 
 
 @router.get('/login', response_class=HTMLResponse, name='admin_login_get')
