@@ -9,7 +9,7 @@ from app.core.templates import templates
 router = APIRouter(tags=["views"])
 
 
-@router.get('/', response_class=HTMLResponse)
+@router.get('/', response_class=HTMLResponse, name='home_page')
 def home_page(request: Request):
     """Ruta raíz condicional: si hay sesión -> redirige a /inbound, si no -> render `inicio.html`."""
     # Si venimos del login con el parámetro `from_login`, mostramos inicio aunque haya sesión.
