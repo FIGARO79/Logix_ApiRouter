@@ -2,18 +2,24 @@
 Router para vistas HTML principales.
 """
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse
-from app.utils.auth import login_required
+from fastapi.responses import HTMLResponse, RedirectResponse
+from app.utils.auth import login_required, get_current_user
 from app.core.templates import templates
 
 router = APIRouter(tags=["views"])
 
 
 @router.get('/', response_class=HTMLResponse)
-def home_page(request: Request, username: str = Depends(login_required)):
-    """Página de inicio."""
-    if not isinstance(username, str):
-        return username  # Return the redirect response if login fails
+def home_page(request: Request):
+    """Ruta raíz condicional: si hay sesión -> redirige a /inbound, si no -> render `inicio.html`."""
+    # Si venimos del login con el parámetro `from_login`, mostramos inicio aunque haya sesión.
+    from_login = request.query_params.get('from_login')
+    if from_login:
+        return templates.TemplateResponse("inicio.html", {"request": request})
+
+    username = get_current_user(request)
+    if username:
+        return RedirectResponse(url='/inbound', status_code=302)
     return templates.TemplateResponse("inicio.html", {"request": request})
 
 

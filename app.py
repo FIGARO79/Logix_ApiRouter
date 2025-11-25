@@ -1203,11 +1203,25 @@ async def update_files_post(
                 if update_option_280 == 'combine':
                     if os.path.exists(GRN_CSV_FILE_PATH):
                         existing_data_df = pd.read_csv(GRN_CSV_FILE_PATH, dtype=str)
-                        # Filtrar duplicados si es necesario, o simplemente concatenar
+                        # Concatenar y luego eliminar duplicados por (GRN_Number, Item_Code),
+                        # manteniendo la fila del archivo nuevo (keep='last').
                         combined_df = pd.concat([existing_data_df, new_data_df], ignore_index=True)
+
+                        # Crear backup del archivo anterior por seguridad
+                        try:
+                            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                            backup_path = GRN_CSV_FILE_PATH + f'.bak_{timestamp}'
+                            shutil.copy2(GRN_CSV_FILE_PATH, backup_path)
+                        except Exception:
+                            # No bloquear el proceso si el backup falla
+                            pass
+
+                        # Eliminar duplicados dejando la fila más reciente (del nuevo archivo)
+                        key_cols = [GRN_COLUMN_NAME_IN_CSV, 'Item_Code']
+                        combined_df = combined_df.drop_duplicates(subset=key_cols, keep='last')
                     else:
                         combined_df = new_data_df
-                    
+
                     combined_df.to_csv(GRN_CSV_FILE_PATH, index=False)
                     message += f'Archivo "{grn_file.filename}" combinado con éxito. '
                 
