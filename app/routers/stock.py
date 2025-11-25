@@ -47,15 +47,4 @@ async def get_item_details_for_label(item_code: str, username: str = Depends(log
     })
 
 
-@router.get('/get_item_for_counting/{item_code}')
-async def get_item_for_counting(item_code: str, username: str = Depends(login_required)):
-    """Obtiene información de un item para conteo."""
-    item_details = await csv_handler.get_item_details_from_master_csv(item_code)
-    if item_details is None:
-        raise HTTPException(status_code=404, detail=f"Artículo {item_code} no encontrado.")
-    
-    return JSONResponse({
-        'itemCode': item_code,
-        'description': item_details.get('Item_Description', ''),
-        'systemBin': item_details.get('Bin_1', '')
-    })
+

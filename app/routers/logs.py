@@ -11,6 +11,11 @@ from fastapi.responses import JSONResponse, Response
 from app.models.schemas import LogEntry
 from app.services import db_logs, csv_handler
 from app.utils.auth import login_required
+from app.core.config import DB_FILE_PATH, ASYNC_DB_URL
+from sqlalchemy.ext.asyncio import create_async_engine
+import numpy as np
+
+async_engine = create_async_engine(ASYNC_DB_URL)
 
 router = APIRouter(prefix="/api", tags=["logs"])
 
@@ -157,3 +162,86 @@ async def export_log(username: str = Depends(login_required)):
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@router.get('/export_reconciliation')
+async def export_reconciliation(username: str = Depends(login_required)):
+    """Genera y exporta el reporte de conciliación."""
+    try:
+        async with async_engine.connect() as conn:
+            logs_df = await conn.run_sync(lambda sync_conn: pd.read_sql_query('SELECT * FROM logs', sync_conn))
+
+        # Accedemos al caché de GRN a través del handler (necesitamos exponerlo o acceder a la variable global si es posible,
+        # pero mejor usamos una función del servicio si existe. En app.py era global.
+        # Aquí asumimos que csv_handler tiene una forma de darnos el DF o lo leemos de nuevo si es necesario.
+        # Revisando csv_handler (no visible aquí pero asumido), si no tiene getter, lo leemos.
+        # Pero app.py usaba df_grn_cache. Vamos a intentar usar csv_handler.df_grn_cache si es accesible
+        # o re-leerlo. Para seguridad y consistencia con app.py original que usaba caché:
+        grn_df = csv_handler.df_grn_cache 
+
+        if logs_df.empty or grn_df is None:
+            raise HTTPException(status_code=404, detail="No hay datos suficientes para generar la conciliación")
+
+        logs_df['qtyReceived'] = pd.to_numeric(logs_df['qtyReceived'], errors='coerce').fillna(0)
+        grn_df['Quantity'] = pd.to_numeric(grn_df['Quantity'], errors='coerce').fillna(0)
+
+        item_totals = logs_df.groupby(['itemCode'])['qtyReceived'].sum().reset_index()
+        item_totals = item_totals.rename(columns={'itemCode': 'Item_Code', 'qtyReceived': 'Total_Recibido'})
+
+        grn_totals = grn_df.groupby(['GRN_Number', 'Item_Code', 'Item_Description'])['Quantity'].sum().reset_index()
+        grn_totals = grn_totals.rename(columns={'Quantity': 'Total_Esperado'})
+
+        merged_df = pd.merge(grn_totals, item_totals, on='Item_Code', how='outer')
+
+        if not logs_df.empty:
+            logs_df['id'] = pd.to_numeric(logs_df['id'])
+            latest_logs = logs_df.sort_values('id', ascending=False).drop_duplicates('itemCode')
+            
+            latest_logs['Ubicacion_Log'] = np.where(
+                latest_logs['relocatedBin'].notna() & (latest_logs['relocatedBin'] != ''),
+                latest_logs['relocatedBin'],
+                latest_logs['binLocation']
+            )
+            
+            locations_df = latest_logs[['itemCode', 'Ubicacion_Log']].rename(columns={'itemCode': 'Item_Code'})
+            merged_df = pd.merge(merged_df, locations_df, on='Item_Code', how='left')
+
+        merged_df['Total_Recibido'] = merged_df['Total_Recibido'].fillna(0)
+        merged_df['Total_Esperado'] = merged_df['Total_Esperado'].fillna(0)
+        merged_df['Diferencia'] = merged_df['Total_Recibido'] - merged_df['Total_Esperado']
+
+        merged_df.fillna({'Ubicacion_Log': 'N/A'}, inplace=True)
+
+        merged_df['Total_Recibido'] = merged_df['Total_Recibido'].astype(int)
+        merged_df['Total_Esperado'] = merged_df['Total_Esperado'].astype(int)
+        merged_df['Diferencia'] = merged_df['Diferencia'].astype(int)
+
+        df_for_export = merged_df.rename(columns={
+            'GRN_Number': 'GRN',
+            'Item_Code': 'Código de Ítem',
+            'Item_Description': 'Descripción',
+            'Ubicacion_Log': 'Ubicación (Log)',
+            'Total_Esperado': 'Cant. Esperada',
+            'Total_Recibido': 'Cant. Recibida',
+            'Diferencia': 'Diferencia'
+        })
+        
+        cols_order = ['GRN', 'Código de Ítem', 'Descripción', 'Ubicación (Log)', 'Cant. Esperada', 'Cant. Recibida', 'Diferencia']
+        df_for_export = df_for_export[cols_order]
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_for_export.to_excel(writer, index=False, sheet_name='ReporteDeConciliacion')
+            worksheet = writer.sheets['ReporteDeConciliacion']
+            for i, col_name in enumerate(df_for_export.columns):
+                column_letter = get_column_letter(i + 1)
+                max_len = max(df_for_export[col_name].astype(str).map(len).max(), len(col_name)) + 2
+                worksheet.column_dimensions[column_letter].width = max_len
+
+        output.seek(0)
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"reporte_conciliacion_{timestamp_str}.xlsx"
+        return Response(content=output.getvalue(), media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error interno al generar el archivo de conciliación: {e}")

@@ -23,12 +23,12 @@ from app.utils.auth import login_required
 from app.core.templates import templates
 
 router = APIRouter(
-    prefix="/update",
+    prefix="",
     tags=["update"]
 )
 
 # --- Endpoint para la página de actualización (GET) ---
-@router.get('', response_class=HTMLResponse)
+@router.get('/update', response_class=HTMLResponse)
 async def update_files_get(request: Request, username: str = Depends(login_required)):
     if not isinstance(username, str):
         return username  # Devuelve la redirección si el login falla
@@ -40,7 +40,7 @@ async def update_files_get(request: Request, username: str = Depends(login_requi
     })
 
 # --- Endpoint para subir y procesar los archivos (POST) ---
-@router.post('', response_class=JSONResponse)
+@router.post('/update', response_class=JSONResponse)
 async def update_files_post(
     request: Request,
     item_master: UploadFile = File(None),

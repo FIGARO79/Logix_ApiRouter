@@ -16,7 +16,7 @@ from app.services.database import init_db
 from app.services.csv_handler import load_csv_data
 
 # Importar routers
-from app.routers import sessions, logs, stock, counts, auth, views, admin, update
+from app.routers import sessions, logs, stock, counts, auth, views, admin, update, picking
 
 # --- Inicialización de FastAPI ---
 app = FastAPI(
@@ -56,6 +56,7 @@ app.include_router(auth.router)
 app.include_router(views.router)
 app.include_router(admin.router)
 app.include_router(update.router)
+app.include_router(picking.router)
 
 # --- Eventos de inicio ---
 @app.on_event("startup")
