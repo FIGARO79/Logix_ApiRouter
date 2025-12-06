@@ -300,8 +300,8 @@
 
     <!-- Contenido principal -->
     <main class="main-content">
-        <div class="container mx-auto max-w-7xl px-4 py-8">
-            <div class="bg-white p-6 rounded-lg shadow border" style="border-color: var(--sap-border);">
+        <div class="container mx-auto max-w-full px-4 py-8">
+            <div class="bg-white px-6 py-6 rounded-lg shadow border" style="border-color: var(--sap-border);">
                 <div
                     style="background: linear-gradient(135deg, var(--sap-header-bg) 0%, #34495e 100%); color: white; padding: 12px 16px; margin: -24px -24px 16px -24px; border-radius: 4px 4px 0 0;">
                     <h1 class="text-base font-semibold" style="margin: 0; letter-spacing: 0.3px;">Confirmación de
@@ -358,7 +358,7 @@
                                         Detalles</button>
                                     <button data-audit-id="{{ audit.id }}" data-audit-date="{{ audit.timestamp }}"
                                         class="edit-audit-btn text-green-600 hover:text-green-900"
-                                        style="display: none;">Editar</button>
+                                        style="display: none;" title="Editar auditoría">✎</button>
                                 </td>
                             </tr>
                             <tr class="details-row" id="details-{{ audit.id }}">
