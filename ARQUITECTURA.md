@@ -161,10 +161,12 @@ ASYNC_DB_URL = ...
 COLUMNS_TO_READ_MASTER = [...]
 COLUMNS_TO_READ_GRN = [...]
 
-# Seguridad
-SECRET_KEY = '...'
-UPDATE_PASSWORD = '...'
+# Seguridad (cargadas desde variables de entorno)
+SECRET_KEY = os.getenv('SECRET_KEY', 'default_for_dev')
+UPDATE_PASSWORD = os.getenv('UPDATE_PASSWORD', 'default_for_dev')
 ```
+
+**Nota de Seguridad**: Las claves secretas ahora se cargan desde variables de entorno usando `os.getenv()`. Ver `CONFIGURACION_ENV.md` para más detalles.
 
 ## 🎯 Ventajas de la Nueva Arquitectura
 
