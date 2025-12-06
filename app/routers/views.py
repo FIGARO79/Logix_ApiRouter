@@ -159,8 +159,30 @@ def picking_page(request: Request, username: str = Depends(login_required)):
 
 
 @router.get('/view_picking_audits', response_class=HTMLResponse)
-def view_picking_audits(request: Request, username: str = Depends(login_required)):
+async def view_picking_audits(request: Request, username: str = Depends(login_required)):
     """Página de visualización de auditorías de picking."""
     if not isinstance(username, str):
         return username
-    return templates.TemplateResponse("view_picking_audits.html", {"request": request})
+    
+    # Cargar auditorías desde la base de datos
+    audits = await load_picking_audits_from_db()
+    return templates.TemplateResponse("view_picking_audits.html", {"request": request, "audits": audits})
+
+
+async def load_picking_audits_from_db():
+    """Carga todas las auditorías de picking con sus items desde la base de datos."""
+    import aiosqlite
+    from app.core.config import DB_FILE_PATH
+    
+    audits = []
+    async with aiosqlite.connect(DB_FILE_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM picking_audits ORDER BY id DESC")
+        rows = await cursor.fetchall()
+        for row in rows:
+            audit = dict(row)
+            cursor_items = await conn.execute("SELECT * FROM picking_audit_items WHERE audit_id = ?", (audit['id'],))
+            items = await cursor_items.fetchall()
+            audit['items'] = [dict(item) for item in items]
+            audits.append(audit)
+    return audits

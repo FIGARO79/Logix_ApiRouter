@@ -420,7 +420,16 @@ async def init_db():
                 )
             ''')
 
+            
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_password_reset_token ON password_reset_tokens (token)")
+
+            # --- Migración: Agregar columna 'packages' a picking_audits si no existe ---
+            cursor = await conn.execute("PRAGMA table_info(picking_audits);")
+            picking_columns = [row['name'] for row in await cursor.fetchall()]
+            if 'packages' not in picking_columns:
+                print("Agregando columna 'packages' a la tabla picking_audits...")
+                await conn.execute("ALTER TABLE picking_audits ADD COLUMN packages INTEGER DEFAULT 0;")
+                print("Columna 'packages' agregada exitosamente.")
 
             await conn.commit()
             print("Esquema de la base de datos verificado/actualizado con éxito.")

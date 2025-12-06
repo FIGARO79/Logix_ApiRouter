@@ -81,8 +81,8 @@ async def save_picking_audit(audit_data: PickingAudit, username: str = Depends(l
             # 1. Insertar la auditoría principal
             cursor = await conn.execute(
                 '''
-                INSERT INTO picking_audits (order_number, despatch_number, customer_name, username, timestamp, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO picking_audits (order_number, despatch_number, customer_name, username, timestamp, status, packages)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''',
                 (
                     audit_data.order_number,
@@ -90,7 +90,8 @@ async def save_picking_audit(audit_data: PickingAudit, username: str = Depends(l
                     audit_data.customer_name,
                     username,
                     datetime.datetime.now().isoformat(timespec='seconds'),
-                    audit_data.status
+                    audit_data.status,
+                    audit_data.packages if audit_data.packages else 0
                 )
             )
             await conn.commit()

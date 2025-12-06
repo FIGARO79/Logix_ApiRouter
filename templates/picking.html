@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logix - Auditoría de Picking</title>
+    <title>Logix - chequeo de Picking</title>
     <link rel="icon" type="image/svg+xml"
         href="{{ secure_url_for(request, 'static', path='images/gear-wide-connected.svg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,10 +27,13 @@
             --sap-hover: #f3f6f9;
             --sap-text: #32383e;
             --sap-yellow: #fbbf24;
+            --sap-success: #10b981;
+            --sap-error: #ef4444;
+            --sap-warning: #f59e0b;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: '72', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f7fa;
             color: var(--sap-text);
             display: flex;
@@ -40,7 +43,6 @@
             margin: 0;
         }
 
-        /* Header superior */
         /* Header superior - SAP Fiori Shell Bar */
         .top-header {
             background-color: var(--sap-header-bg);
@@ -173,6 +175,172 @@
             overflow-y: auto;
         }
 
+        /* SAP Fiori Form Elements */
+        input[type="text"],
+        input[type="number"] {
+            border: 1px solid var(--sap-border);
+            padding: 8px 12px;
+            border-radius: 3px;
+            font-size: 13px;
+            background-color: #ffffff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--sap-primary);
+            box-shadow: 0 0 0 2px rgba(0, 112, 210, 0.1);
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: block;
+            color: var(--sap-text);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* SAP Fiori Buttons */
+        button {
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 13px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: none;
+            font-family: inherit;
+        }
+
+        button:hover:not(:disabled) {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .btn-primary {
+            background-color: var(--sap-primary);
+            color: white;
+            border: 1px solid var(--sap-primary-dark);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--sap-primary-dark);
+        }
+
+        .btn-success {
+            background-color: var(--sap-success);
+            color: white;
+            border: 1px solid #059669;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background-color: #059669;
+        }
+
+        .btn-secondary {
+            background-color: #5a6c7d;
+            color: white;
+            border: 1px solid #4a5c6d;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #4a5c6d;
+        }
+
+        .btn-warning {
+            background-color: var(--sap-warning);
+            color: white;
+            border: 1px solid #d97706;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background-color: #d97706;
+        }
+
+        .btn-danger {
+            background-color: var(--sap-error);
+            color: white;
+            border: 1px solid #dc2626;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+
+        /* SAP Fiori Section Headers */
+        .section-header {
+            background: linear-gradient(135deg, var(--sap-header-bg) 0%, #34495e 100%);
+            color: white;
+            padding: 12px 16px;
+            margin: -24px -24px 16px -24px;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .section-header h1,
+        .section-header h2 {
+            margin: 0;
+            letter-spacing: 0.3px;
+            font-weight: 600;
+        }
+
+        /* SAP Fiori Cards */
+        .sap-card {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--sap-border);
+            padding: 24px;
+        }
+
+        /* SAP Fiori Tables */
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+            border-bottom: 2px solid var(--sap-border);
+        }
+
+        tbody tr {
+            transition: background-color 0.15s ease;
+        }
+
+        tbody tr:hover {
+            background-color: var(--sap-hover);
+        }
+
+        tbody td {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        /* Inputs dentro de tablas - más visibles */
+        table input[type="number"] {
+            border: 1.5px solid var(--sap-border);
+            background-color: #ffffff;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        table input[type="number"]:focus {
+            border-color: var(--sap-primary);
+            box-shadow: 0 0 0 2px rgba(0, 112, 210, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
         /* Ocultar el 'spinner' de los inputs numéricos */
         input[type='number']::-webkit-inner-spin-button,
         input[type='number']::-webkit-outer-spin-button {
@@ -187,10 +355,22 @@
 
         /* Estilo para el lector de QR */
         #qr-reader {
-            border: 2px dashed #cbd5e0;
-            border-radius: 8px;
+            border: 2px dashed var(--sap-border);
+            border-radius: 4px;
             overflow: hidden;
             background-color: #f7fafc;
+        }
+
+        /* SAP Fiori Messages/Toasts */
+        #message-box {
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* SAP Fiori Modals */
+        .modal-content {
+            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
@@ -219,7 +399,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
         </button>
-        <h1 class="header-title">Logix - Auditoría de Picking</h1>
+        <h1 class="header-title">Logix - Chequeo de Picking</h1>
     </header>
 
     <!-- Menú desplegable -->
@@ -306,7 +486,7 @@
                     <path
                         d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l1.313 7h8.17l1.313-7zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2" />
                 </svg>
-                <span>Auditoría de Picking</span>
+                <span>Chequeo de Picking</span>
             </a>
             <a href="/view_picking_audits">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
@@ -340,7 +520,7 @@
 
                 <!-- Sección 1: Carga de Pedido -->
                 <section id="load-section" class="mb-6">
-                    <h1 class="text-3xl font-bold text-gray-800 mb-6">Auditoría de Picking</h1>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-6">Chequeo de Picking</h1>
                     <h2 class="text-xl font-semibold mb-4">1. Cargar Pedido</h2>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -366,7 +546,7 @@
                     </button>
                 </section>
 
-                <!-- Sección 2: Auditoría (Oculta por defecto) -->
+                <!-- Sección 2: Chequeo (Oculta por defecto) -->
                 <section id="audit-section" class="hidden">
                     <header class="mb-6">
                         <h1 class="text-3xl font-bold text-gray-800">Chequeo de picking</h1>
@@ -445,7 +625,7 @@
                     </div>
 
                     <!-- Acciones Finales (Diseño de la imagen) -->
-                    <div class="mt-8 flex flex-col md:flex-row gap-4">
+                    <div class="mt-4 flex flex-col md:flex-row gap-4">
                         <button id="finalize-btn"
                             class="flex-1 order-1 bg-green-600 text-white py-3 px-6 rounded-md font-semibold shadow-sm hover:bg-green-700 text-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                             Finalizar Auditoría
@@ -512,6 +692,24 @@
             </div>
         </div>
 
+        <!-- Modal de Cantidad de Bultos/Paquetes -->
+        <div id="packages-modal"
+            class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Cantidad de Bultos</h3>
+                <p class="text-gray-700 mb-4">Ingrese la cantidad total de bultos o paquetes del pedido:</p>
+                <input type="number" id="packages-input" inputmode="numeric" aria-label="Cantidad de bultos"
+                    placeholder="0" min="1"
+                    class="w-full text-center border border-gray-300 rounded-md shadow-sm py-2 text-2xl" />
+                <div class="flex justify-end gap-4 mt-6">
+                    <button id="cancel-packages-btn"
+                        class="py-2 px-4 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300">Cancelar</button>
+                    <button id="confirm-packages-btn"
+                        class="py-2 px-4 btn-success text-white rounded-md font-semibold">Confirmar</button>
+                </div>
+            </div>
+        </div>
+
 
         <script>
             // --- Variables Globales ---
@@ -520,6 +718,7 @@
             let html5QrCode;
             let soundBeep, soundBoop;
             let currentItemForQuantity = null;
+            let packagesQuantity = 0; // Cantidad de bultos/paquetes
 
             // --- Selectores del DOM ---
             const loadSection = document.getElementById('load-section');
@@ -548,6 +747,10 @@
             const confirmQuantityBtn = document.getElementById('confirm-quantity-btn');
             const scannerModal = document.getElementById('scanner-modal');
             const closeScannerBtn = document.getElementById('close-scanner-btn');
+            const packagesModal = document.getElementById('packages-modal');
+            const packagesInput = document.getElementById('packages-input');
+            const cancelPackagesBtn = document.getElementById('cancel-packages-btn');
+            const confirmPackagesBtn = document.getElementById('confirm-packages-btn');
 
             // --- Inicialización ---
             document.addEventListener('DOMContentLoaded', () => {
@@ -586,6 +789,9 @@
             confirmModalBtn.addEventListener('click', confirmFinalizeWithDifferences);
             cancelQuantityBtn.addEventListener('click', hideQuantityModal);
             confirmQuantityBtn.addEventListener('click', confirmQuantity);
+            cancelPackagesBtn.addEventListener('click', hidePackagesModal);
+            confirmPackagesBtn.addEventListener('click', confirmPackages);
+            packagesInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); confirmPackages(); } });
             quantityInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); confirmQuantity(); } });
 
             // --- Funciones Principales ---
@@ -687,13 +893,13 @@
 
                     // ***** CORRECCIÓN APLICADA AQUÍ (tbody) *****
                     row.innerHTML = `
-                        <td class="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm font-medium text-gray-900">${item.code}</td>
-                        <td class="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-gray-600">${item.description}</td>
-                        <td class="px-2 py-2 md:px-4 md:py-3 whitespace-nowrap text-xs md:text-sm font-bold text-blue-700 text-center">${item.qty_req}</td>
-                        <td class="px-2 py-2 md:px-4 md:py-3 whitespace-nowrap text-xs md:text-sm font-bold text-center">
+                        <td class="px-2 py-1 md:px-4 md:py-1 text-xs md:text-sm font-medium text-gray-900">${item.code}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-1 text-xs md:text-sm text-gray-600">${item.description}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-1 whitespace-nowrap text-xs md:text-sm font-bold text-blue-700 text-center">${item.qty_req}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-1 whitespace-nowrap text-xs md:text-sm font-bold text-center">
                             <input type="number" value="${item.qty_scan}" min="0" class="w-12 text-center text-base md:text-sm border border-gray-300 rounded-md shadow-sm py-1" data-index="${index}">
                         </td>
-                        <td class="px-2 py-2 md:px-4 md:py-3 whitespace-nowrap text-xs md:text-sm font-semibold ${diffClass} text-center">${diff}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-1 whitespace-nowrap text-xs md:text-sm font-semibold ${diffClass} text-center">${diff}</td>
                     `;
                     itemsTableBody.appendChild(row);
                 });
@@ -869,7 +1075,7 @@
             }
 
             /**
-             * Finaliza la auditoría. Comprueba diferencias.
+             * Finaliza la auditoría. Comprueba diferencias y solicita cantidad de bultos.
              */
             async function finalizeAudit() {
                 // Asegurarse de que se haya cargado un pedido
@@ -884,12 +1090,8 @@
                     // Hay diferencias, mostrar modal de confirmación
                     confirmationModal.classList.remove('hidden');
                 } else {
-                    // Todo OK
-                    const saved = await saveAuditData('Completo');
-                    if (saved) {
-                        showMessage("¡Auditoría Finalizada! Picking OK y guardado.", "success", 5000);
-                        resetApp();
-                    }
+                    // Todo OK, mostrar modal de bultos
+                    showPackagesModal();
                 }
             }
 
@@ -898,9 +1100,49 @@
              */
             async function confirmFinalizeWithDifferences() {
                 confirmationModal.classList.add('hidden');
-                const saved = await saveAuditData('Con Diferencia');
+                // Mostrar modal de bultos antes de guardar
+                showPackagesModal();
+            }
+
+            /**
+             * Muestra el modal para ingresar cantidad de bultos.
+             */
+            function showPackagesModal() {
+                packagesInput.value = '';
+                packagesModal.classList.remove('hidden');
+                packagesInput.focus();
+            }
+
+            /**
+             * Oculta el modal de bultos.
+             */
+            function hidePackagesModal() {
+                packagesModal.classList.add('hidden');
+            }
+
+            /**
+             * Confirma la cantidad de bultos y procede a guardar.
+             */
+            async function confirmPackages() {
+                const packages = parseInt(packagesInput.value, 10);
+                if (isNaN(packages) || packages < 1) {
+                    showMessage('Por favor ingrese una cantidad válida de bultos (mínimo 1).', 'error');
+                    return;
+                }
+
+                packagesQuantity = packages;
+                hidePackagesModal();
+
+                // Determinar el estado según si hay diferencias
+                const differencesExist = orderItems.some(item => item.qty_scan !== item.qty_req);
+                const status = differencesExist ? 'Con Diferencia' : 'Completo';
+
+                const saved = await saveAuditData(status);
                 if (saved) {
-                    showMessage("Auditoría finalizada y guardada con diferencias.", "warning", 5000);
+                    const message = differencesExist
+                        ? `¡Auditoría Finalizada con diferencias! ${packages} bulto(s). Guardado.`
+                        : `¡Auditoría Finalizada! ${packages} bulto(s). Picking OK y guardado.`;
+                    showMessage(message, "success", 5000);
                     resetApp();
                 }
             }
