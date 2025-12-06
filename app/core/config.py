@@ -18,7 +18,7 @@ ASYNC_DB_URL = f"sqlite+aiosqlite:///{DB_FILE_PATH}"
 # --- Configuración de Columnas CSV ---
 COLUMNS_TO_READ_MASTER = [
     'Item_Code', 'Item_Description', 'ABC_Code_stockroom', 'Physical_Qty','Frozen_Qty','Weight_per_Unit',
-    'Bin_1', 'Aditional_Bin_Location','SupersededBy'
+    'Bin_1', 'Aditional_Bin_Location','SupersededBy', 'SIC_Code_stockroom'
 ]
 GRN_COLUMN_NAME_IN_CSV = 'GRN_Number'
 COLUMNS_TO_READ_GRN = [GRN_COLUMN_NAME_IN_CSV, 'Item_Code', 'Quantity', 'Item_Description']

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from app.utils.auth import login_required, get_current_user
 from app.core.templates import templates
+from app.services import db_logs
 
 router = APIRouter(tags=["views"])
 
@@ -32,11 +33,12 @@ def inbound_page(request: Request, username: str = Depends(login_required)):
 
 
 @router.get('/view_logs', response_class=HTMLResponse)
-def view_logs(request: Request, username: str = Depends(login_required)):
-    """Página de visualización de logs."""
+async def view_logs(request: Request, username: str = Depends(login_required)):
+    """Página para ver los logs de inbound."""
     if not isinstance(username, str):
         return username
-    return templates.TemplateResponse("view_logs.html", {"request": request})
+    all_logs = await db_logs.load_log_data_db_async()
+    return templates.TemplateResponse("view_logs.html", {"request": request, "logs": all_logs})
 
 
 @router.get('/label', response_class=HTMLResponse)

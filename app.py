@@ -26,9 +26,6 @@ from urllib.parse import urlencode
 import shutil
 import json
 
-# Importar configuración de seguridad desde variables de entorno
-from app.core.config import SECRET_KEY, UPDATE_PASSWORD
-
 # --- Cache para DataFrames ---
 df_master_cache = None
 df_grn_cache = None
@@ -145,6 +142,10 @@ def secure_url_for(request: Request, name: str, **path_params):
 
 # Hacer el helper disponible en todas las plantillas Jinja2
 templates.env.globals['secure_url_for'] = secure_url_for
+
+# --- CONFIGURACIÓN DE SEGURIDAD ---
+SECRET_KEY = 'una-clave-secreta-muy-dificil-de-adivinar'
+UPDATE_PASSWORD = 'warehouse_admin_2025'
 
 # --- Modelos Pydantic ---
 class LogEntry(BaseModel):

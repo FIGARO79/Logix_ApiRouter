@@ -27,23 +27,30 @@ async def find_item(item_code: str, import_reference: str, username: str = Depen
     if item_details is None:
         raise HTTPException(status_code=404, detail=f"Artículo {item_code} no encontrado en el maestro.")
     
-    total_received = await db_logs.get_total_received_for_import_reference_async(import_reference, item_code)
-    total_expected = await csv_handler.get_total_expected_quantity_for_item(item_code)
-    latest_bin = await db_logs.get_latest_relocated_bin_async(item_code)
+    expected_quantity = await csv_handler.get_total_expected_quantity_for_item(item_code)
+    original_bin = item_details.get('Bin_1', 'N/A')
+    latest_relocated_bin = await db_logs.get_latest_relocated_bin_async(item_code)
+    effective_bin_location = latest_relocated_bin if latest_relocated_bin else original_bin
     
-    return JSONResponse({
-        'itemCode': item_code,
-        'itemDescription': item_details.get('Item_Description', ''),
-        'binLocation': item_details.get('Bin_1', ''),
-        'totalReceived': total_received,
-        'totalExpected': total_expected,
-        'latestBin': latest_bin or item_details.get('Bin_1', '')
-    })
+    response_data = {
+        "itemCode": item_details.get('Item_Code', item_code),
+        "description": item_details.get('Item_Description', 'N/A'),
+        "binLocation": effective_bin_location,
+        "aditionalBins": item_details.get('Aditional_Bin_Location', 'N/A'),
+        "weight": item_details.get('Weight_per_Unit', 'N/A'),
+        "defaultQtyGrn": expected_quantity,
+        "itemType": item_details.get('ABC_Code_stockroom', 'N/A'),
+        "sicCode": item_details.get('SIC_Code_stockroom', 'N/A')
+    }
+    return JSONResponse(content=response_data)
 
 
 @router.post('/add_log')
 async def add_log(data: LogEntry, username: str = Depends(login_required)):
     """Añade un registro de entrada."""
+    if data.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Cantidad debe ser > 0")
+    
     item_code_form = data.itemCode
     import_reference = data.importReference
     quantity_received_form = data.quantity
@@ -51,6 +58,11 @@ async def add_log(data: LogEntry, username: str = Depends(login_required)):
     item_details = await csv_handler.get_item_details_from_master_csv(item_code_form)
     if item_details is None:
         raise HTTPException(status_code=404, detail=f"Artículo {item_code_form} no encontrado.")
+    
+    # Obtener la ubicación efectiva (reubicada si existe, o la original del maestro)
+    original_bin_from_master = item_details.get('Bin_1', 'N/A')
+    latest_relocated_bin_for_item = await db_logs.get_latest_relocated_bin_async(item_code_form)
+    bin_to_log_as_original = latest_relocated_bin_for_item if latest_relocated_bin_for_item else original_bin_from_master
     
     total_received_before = await db_logs.get_total_received_for_import_reference_async(import_reference, item_code_form)
     total_expected = await csv_handler.get_total_expected_quantity_for_item(item_code_form)
@@ -62,8 +74,8 @@ async def add_log(data: LogEntry, username: str = Depends(login_required)):
         'importReference': import_reference,
         'waybill': data.waybill,
         'itemCode': item_code_form,
-        'itemDescription': item_details.get('Item_Description', ''),
-        'binLocation': item_details.get('Bin_1', ''),
+        'itemDescription': item_details.get('Item_Description', 'N/A'),
+        'binLocation': bin_to_log_as_original,  # Ubicación efectiva
         'relocatedBin': data.relocatedBin or '',
         'qtyReceived': quantity_received_form,
         'qtyGrn': total_expected,
@@ -72,7 +84,8 @@ async def add_log(data: LogEntry, username: str = Depends(login_required)):
     
     log_id = await db_logs.save_log_entry_db_async(entry_data)
     if log_id:
-        return JSONResponse({'message': 'Registro añadido con éxito.', 'logId': log_id}, status_code=201)
+        log_entry_data_for_response = {"id": log_id, **entry_data}
+        return JSONResponse({'message': 'Registro añadido con éxito.', 'entry': log_entry_data_for_response}, status_code=201)
     raise HTTPException(status_code=500, detail="Error al guardar el registro.")
 
 
